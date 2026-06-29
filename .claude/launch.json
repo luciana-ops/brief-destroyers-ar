@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "brief-destroyers-ar",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", ".", "-p", "3500", "--no-clipboard"],
+      "port": 3500
+    }
+  ]
+}
