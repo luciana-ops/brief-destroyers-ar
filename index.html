@@ -630,6 +630,8 @@ async function callClaude(base64, mediaType, prompt) {
     })
   });
   const data = await r.json();
+  if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+  if (!data.content || !data.content[0]) throw new Error('Respuesta inesperada de la API: ' + JSON.stringify(data));
   return data.content[0].text;
 }
 function fileToBase64(file) {
