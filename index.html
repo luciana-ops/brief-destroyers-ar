@@ -620,13 +620,20 @@ async function sheetsDeleteMultiple(sheetName, ids) {
 
 // ─── CLAUDE AI ───────────────────────────────────────────────────
 async function callClaude(base64, mediaType, prompt) {
+  const isPDF = mediaType === 'application/pdf';
+  const content = isPDF
+    ? [
+        { type:'document', source:{ type:'base64', media_type:'application/pdf', data: base64 }},
+        { type:'text', text: prompt }
+      ]
+    : [
+        { type:'image', source:{ type:'base64', media_type: mediaType, data: base64 }},
+        { type:'text', text: prompt }
+      ];
   const r = await fetch('/api/claude', { method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
       model: 'claude-sonnet-4-6', max_tokens: 1024,
-      messages: [{ role:'user', content:[
-        { type:'image', source:{ type:'base64', media_type: mediaType, data: base64 }},
-        { type:'text', text: prompt }
-      ]}]
+      messages: [{ role:'user', content }]
     })
   });
   const data = await r.json();
