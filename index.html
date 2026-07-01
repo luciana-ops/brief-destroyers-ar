@@ -972,9 +972,6 @@ function openFacturaModal() {
   document.getElementById('fac-ai-info').style.display='none';
   document.getElementById('fac-dup-warning').style.display='none';
   document.getElementById('fac-file').value='';
-  document.getElementById('fac-maestro-sel').value='';
-  if (!_maestro.length) sheetsGet('MAESTRO').then(d=>{_maestro=d;populateMaestroSelect();});
-  else populateMaestroSelect();
   openModal('modal-factura');
 }
 async function handleFacturaDrop(e) {
