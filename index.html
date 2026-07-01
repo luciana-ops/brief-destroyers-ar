@@ -208,6 +208,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="nav-item" onclick="navigate('cc-clientes')"><i class="fa-solid fa-users"></i> CC Clientes</div>
     <div class="nav-item" onclick="navigate('cc-proveedores')"><i class="fa-solid fa-truck"></i> CC Proveedores</div>
     <div class="nav-item" onclick="navigate('gastos')"><i class="fa-solid fa-receipt"></i> Gastos</div>
+    <div class="nav-item" onclick="navigate('extracto')"><i class="fa-solid fa-building-columns"></i> Extracto</div>
     <div class="nav-item" onclick="navigate('maestro')"><i class="fa-solid fa-address-book"></i> Maestro</div>
   </nav>
   <div id="sidebar-footer">Sesión: <span id="user-label">—</span></div>
@@ -385,10 +386,34 @@ tr:hover td{background:rgba(255,255,255,.03)}
       <button class="btn btn-secondary btn-sm" onclick="exportGastosExcel()"><i class="fa-solid fa-file-excel"></i> Excel</button>
     </div>
     <div class="table-wrap">
-      <table><thead><tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Monto</th><th>Quién</th><th>Notas</th><th></th></tr></thead>
+      <table><thead><tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Monto</th><th>Medio</th><th>Quién</th><th>Notas</th><th></th></tr></thead>
       <tbody id="g-tbody"></tbody></table>
     </div>
     <div style="text-align:right;margin-top:12px;font-size:16px;font-weight:700" id="g-total"></div>
+  </div>
+</div>
+
+<!-- EXTRACTO BANCARIO -->
+<div id="section-extracto" class="section">
+  <div class="page-header">
+    <h2><i class="fa-solid fa-building-columns"></i> Extracto Bancario</h2>
+  </div>
+  <div style="max-width:560px;margin-bottom:24px">
+    <div class="dropzone" id="ext-dropzone" onclick="document.getElementById('ext-file').click()">
+      <i class="fa-solid fa-file-lines"></i>
+      <p>Subí el PDF del extracto bancario</p>
+    </div>
+    <input type="file" id="ext-file" accept=".pdf" style="display:none" onchange="handleExtracto(this)">
+    <div id="ext-loading" style="display:none" class="loading"><div class="spinner"></div> Procesando extracto con IA...</div>
+  </div>
+  <div class="filters">
+    <select id="ext-year" onchange="renderExtracto()"></select>
+    <select id="ext-month" onchange="renderExtracto()"><option value="">Todos los meses</option><option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option><option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option><option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option></select>
+    <select id="ext-tipo" onchange="renderExtracto()"><option value="">Todos</option><option value="credito">Créditos</option><option value="debito">Débitos</option></select>
+  </div>
+  <div class="table-wrap">
+    <table><thead><tr><th>Fecha</th><th>Descripción</th><th>Tipo</th><th>Monto</th><th>Factura match</th><th>Estado</th><th></th></tr></thead>
+    <tbody id="ext-tbody"></tbody></table>
   </div>
 </div>
 
@@ -617,6 +642,9 @@ tr:hover td{background:rgba(255,255,255,.03)}
           <select id="ga-quien"><option value="Fiamma">Fiamma</option><option value="Lu">Lu</option><option value="Otro">Otro</option></select>
         </div>
       </div>
+      <div class="form-group"><label>Medio de pago</label>
+        <select id="ga-medio"><option value="efectivo">Efectivo / Caja</option><option value="transferencia">Transferencia</option><option value="tarjeta">Tarjeta</option><option value="otro">Otro</option></select>
+      </div>
       <div class="form-group"><label>Notas</label><textarea id="ga-notas"></textarea></div>
     </div>
     <div class="modal-footer">
@@ -756,7 +784,7 @@ function pinCheck() {
 
 // ─── APP INIT ────────────────────────────────────────────────────
 function initApp() {
-  ['dash','f','co','pa','r','g'].forEach(p => yearOptions(p + '-year'));
+  ['dash','f','co','pa','r','g','ext'].forEach(p => yearOptions(p + '-year'));
   const cur = String(new Date().getMonth()+1).padStart(2,'0');
   ['dash-month','f-month','co-month','pa-month','r-month','g-month'].forEach(id => {
     const el = document.getElementById(id);
@@ -783,6 +811,7 @@ function navigate(section) {
   if (section === 'cc-clientes') loadAndRenderCCClientes();
   if (section === 'cc-proveedores') loadAndRenderCCProveedores();
   if (section === 'gastos') loadAndRenderGastos();
+  if (section === 'extracto') loadAndRenderExtracto();
   if (section === 'maestro') loadAndRenderMaestro();
 }
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
@@ -1851,7 +1880,8 @@ function renderGastos() {
     return true;
   });
   const tbody=document.getElementById('g-tbody');
-  tbody.innerHTML=rows.length?rows.map(r=>`<tr><td>${d(r[1])}</td><td>${r[2]}</td><td>${r[3]}</td><td>${fmtARS(r[4])}</td><td>${r[5]}</td><td style="font-size:12px;color:var(--muted)">${r[6]||''}</td><td>${currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteGasto('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`).join(''):'<tr class="empty-row"><td colspan="7">Sin gastos registrados</td></tr>';
+  const medioLabel={'efectivo':'💵 Efectivo','transferencia':'🏦 Transfer.','tarjeta':'💳 Tarjeta','otro':'Otro'};
+  tbody.innerHTML=rows.length?rows.map(r=>`<tr><td>${d(r[1])}</td><td>${r[2]}</td><td>${r[3]}</td><td>${fmtARS(r[4])}</td><td style="font-size:12px">${medioLabel[r[7]]||r[7]||'—'}</td><td>${r[5]}</td><td style="font-size:12px;color:var(--muted)">${r[6]||''}</td><td>${currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteGasto('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`).join(''):'<tr class="empty-row"><td colspan="8">Sin gastos registrados</td></tr>';
   const total=rows.reduce((s,r)=>s+Number(r[4]||0),0);
   document.getElementById('g-total').textContent='Total: '+fmtARS(total);
 }
@@ -1862,20 +1892,100 @@ async function deleteGasto(id) {
 function openGastoModal() {
   document.getElementById('ga-fecha').value=today();
   ['ga-monto','ga-desc','ga-notas'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('ga-medio').value='efectivo';
   openModal('modal-gasto');
 }
 async function saveGasto() {
   const btn=document.getElementById('ga-save-btn');btn.disabled=true;
   const id='G'+Date.now();
-  const row=[id,document.getElementById('ga-fecha').value,document.getElementById('ga-desc').value,document.getElementById('ga-cat').value,Number(document.getElementById('ga-monto').value)||0,document.getElementById('ga-quien').value,document.getElementById('ga-notas').value];
+  const row=[id,document.getElementById('ga-fecha').value,document.getElementById('ga-desc').value,document.getElementById('ga-cat').value,Number(document.getElementById('ga-monto').value)||0,document.getElementById('ga-quien').value,document.getElementById('ga-notas').value,document.getElementById('ga-medio').value];
   try {
     await sheetsAppend('GASTOS',[row]);_gastos.push(row);
     renderGastos();closeModal('modal-gasto');toast('Gasto guardado');
   } catch(e){toast('Error: '+e.message,'error');btn.disabled=false;}
 }
 function exportGastosExcel() {
-  const data=[['Fecha','Descripción','Categoría','Monto','Quién','Notas'],..._gastos.map(r=>[d(r[1]),r[2],r[3],r[4],r[5],r[6]])];
+  const data=[['Fecha','Descripción','Categoría','Monto','Medio de pago','Quién','Notas'],..._gastos.map(r=>[d(r[1]),r[2],r[3],r[4],r[7]||'',r[5],r[6]])];
   const ws=XLSX.utils.aoa_to_sheet(data);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Gastos');XLSX.writeFile(wb,'gastos.xlsx');
+}
+
+// ─── EXTRACTO BANCARIO ───────────────────────────────────────────
+let _extracto=[];
+async function loadAndRenderExtracto() {
+  _extracto=await sheetsGet('EXTRACTO');
+  renderExtracto();
+}
+function renderExtracto() {
+  const year=getFilter('ext-year'),month=getFilter('ext-month'),tipo=getFilter('ext-tipo');
+  const rows=_extracto.filter(r=>{
+    const fd=String(r[1]||'');
+    if(year&&!fd.startsWith(year))return false;
+    if(month&&fd.substring(5,7)!==month)return false;
+    if(tipo&&String(r[3])!==tipo)return false;
+    return true;
+  });
+  const tbody=document.getElementById('ext-tbody');
+  if(!tbody)return;
+  tbody.innerHTML=rows.length?rows.map(r=>{
+    const estado=String(r[6]||'');
+    const badge=estado==='match'?'<span style="color:#22c55e;font-weight:600">✓ match</span>':'<span style="color:var(--muted)">sin match</span>';
+    const tipo=String(r[3]||'');
+    const tipoLabel=tipo==='credito'?'<span style="color:#22c55e">↓ Crédito</span>':'<span style="color:#ef4444">↑ Débito</span>';
+    return `<tr><td>${d(r[1])}</td><td style="max-width:280px;font-size:13px">${r[2]||''}</td><td>${tipoLabel}</td><td>${fmtARS(r[4])}</td><td style="font-size:12px;color:var(--muted)">${r[5]||''}</td><td>${badge}</td><td>${currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteExtracto('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`;
+  }).join(''):'<tr class="empty-row"><td colspan="7">Sin movimientos</td></tr>';
+}
+async function deleteExtracto(id) {
+  if(!confirm('¿Eliminar movimiento?'))return;
+  await sheetsDelete('EXTRACTO',id);_extracto=_extracto.filter(r=>r[0]!==id);renderExtracto();toast('Movimiento eliminado');
+}
+async function handleExtracto(input) {
+  const file=input.files[0];
+  if(!file)return;
+  input.value='';
+  document.getElementById('ext-loading').style.display='flex';
+  try {
+    const base64=await fileToBase64(file);
+    const prompt=`Sos un experto en extractos bancarios argentinos. Extraé TODOS los movimientos del extracto.
+Para cada movimiento devolvé:
+- fecha: YYYY-MM-DD
+- descripcion: descripción del movimiento
+- tipo: "credito" o "debito"
+- monto: monto en ARS (solo número positivo)
+- cuit: CUIT del beneficiario/origen si aparece (formato XX-XXXXXXXX-X, opcional)
+
+Respondé SOLO con un JSON array válido, sin markdown. Ejemplo: [{"fecha":"2026-01-15","descripcion":"Transferencia recibida EMPRESA SA","tipo":"credito","monto":121000,"cuit":"30-12345678-9"}]`;
+    const body={model:'claude-sonnet-4-6',max_tokens:3000,messages:[{role:'user',content:[
+      {type:'document',source:{type:'base64',media_type:'application/pdf',data:base64}},
+      {type:'text',text:prompt}
+    ]}]};
+    const resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const data=await resp.json();
+    const text=data.content[0].text.replace(/```json|```/g,'').trim();
+    const movimientos=JSON.parse(text);
+    document.getElementById('ext-loading').style.display='none';
+    const nuevos=movimientos.map(m=>{
+      const id='E'+Date.now()+Math.random().toString(36).substr(2,5);
+      let matchFolio='',estado='sin_match';
+      const cuitNorm=(m.cuit||'').replace(/\D/g,'');
+      const match=_facturas.find(f=>{
+        if(String(f[5]).toLowerCase()!=='venta')return false;
+        if(String(f[10]).toLowerCase()==='anulada')return false;
+        if(cuitNorm&&String(f[3]||'').replace(/\D/g,'')===cuitNorm)return true;
+        const desc=(m.descripcion||'').toLowerCase();
+        return desc.includes(String(f[4]||'').toLowerCase())||desc.includes(String(f[2]||'').toLowerCase());
+      });
+      if(match){matchFolio=match[2];estado='match';}
+      return [id,m.fecha,m.descripcion,m.tipo,m.monto,matchFolio,estado,''];
+    });
+    await sheetsAppend('EXTRACTO',nuevos);
+    _extracto.push(...nuevos);
+    renderExtracto();
+    const matchCount=nuevos.filter(r=>r[6]==='match').length;
+    toast(`${nuevos.length} movimientos importados — ${matchCount} con match`);
+  } catch(e){
+    document.getElementById('ext-loading').style.display='none';
+    toast('Error procesando extracto: '+e.message,'error');
+  }
 }
 </script>
 </body>
