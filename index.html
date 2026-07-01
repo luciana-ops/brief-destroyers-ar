@@ -1063,7 +1063,7 @@ async function saveCobro() {
       const crRow = [crId, fecha, document.getElementById('co-banco').value, document.getElementById('co-nrocheque').value, cuit, razon, monto, document.getElementById('co-vencimiento').value, folio, 'en_cartera', ''];
       await sheetsAppend('CHEQUES_RECIBIDOS', [crRow]);
     }
-    const totalCobrado = _cobros.filter(r=>r[2]===folio).reduce((s,r)=>s+Number(r[5]||0),0) + monto;
+    const totalCobrado = _cobros.filter(r=>r[2]===folio).reduce((s,r)=>s+Number(r[5]||0),0);
     const nuevoEstado = totalCobrado >= totalFac ? 'cobrada' : 'parcial';
     await sheetsUpdateById('FACTURAS', facId, 'K', nuevoEstado);
     const fi = _facturas.findIndex(r=>r[0]===facId);
@@ -1146,7 +1146,7 @@ async function savePago() {
       const ceRow=[ceId,fecha,document.getElementById('pa-banco').value,document.getElementById('pa-nrocheque').value,cuit,razon,monto,document.getElementById('pa-vencimiento').value,folio,''];
       await sheetsAppend('CHEQUES_EMITIDOS',[ceRow]);
     }
-    const totalPagado=_pagos.filter(r=>r[2]===folio).reduce((s,r)=>s+Number(r[5]||0),0)+monto;
+    const totalPagado=_pagos.filter(r=>r[2]===folio).reduce((s,r)=>s+Number(r[5]||0),0);
     const nuevoEstado=totalPagado>=totalFac?'pagada':'parcial';
     await sheetsUpdateById('FACTURAS',facId,'K',nuevoEstado);
     const fi=_facturas.findIndex(r=>r[0]===facId);
