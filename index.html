@@ -208,6 +208,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="nav-item" onclick="navigate('cc-clientes')"><i class="fa-solid fa-users"></i> CC Clientes</div>
     <div class="nav-item" onclick="navigate('cc-proveedores')"><i class="fa-solid fa-truck"></i> CC Proveedores</div>
     <div class="nav-item" onclick="navigate('gastos')"><i class="fa-solid fa-receipt"></i> Gastos</div>
+    <div class="nav-item" onclick="navigate('maestro')"><i class="fa-solid fa-address-book"></i> Maestro</div>
   </nav>
   <div id="sidebar-footer">Sesión: <span id="user-label">—</span></div>
 </div>
@@ -350,6 +351,26 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div id="cc-proveedores-list"></div>
   </div>
 
+  <!-- MAESTRO -->
+  <div id="section-maestro" class="section">
+    <div class="page-header">
+      <h2><i class="fa-solid fa-address-book"></i> Maestro de Contactos</h2>
+      <button class="btn btn-primary" onclick="openMaestroModal()"><i class="fa-solid fa-plus"></i> Agregar</button>
+    </div>
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('maestro','clientes',this)">Clientes</div>
+      <div class="tab" onclick="switchTab('maestro','proveedores',this)">Proveedores</div>
+    </div>
+    <div id="tab-maestro-clientes" class="tab-panel active">
+      <div class="filters"><input id="m-search-cli" type="text" placeholder="Buscar por nombre o CUIT..." oninput="renderMaestro('cliente')" style="padding:7px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;width:260px"></div>
+      <div class="table-wrap"><table><thead><tr><th>Razón Social</th><th>CUIT</th><th>Cond. IVA</th><th>Email</th><th>Teléfono</th><th>Notas</th><th></th></tr></thead><tbody id="m-tbody-cli"></tbody></table></div>
+    </div>
+    <div id="tab-maestro-proveedores" class="tab-panel">
+      <div class="filters"><input id="m-search-prov" type="text" placeholder="Buscar por nombre o CUIT..." oninput="renderMaestro('proveedor')" style="padding:7px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;width:260px"></div>
+      <div class="table-wrap"><table><thead><tr><th>Razón Social</th><th>CUIT</th><th>Cond. IVA</th><th>Email</th><th>Teléfono</th><th>Notas</th><th></th></tr></thead><tbody id="m-tbody-prov"></tbody></table></div>
+    </div>
+  </div>
+
   <!-- GASTOS -->
   <div id="section-gastos" class="section">
     <div class="page-header">
@@ -398,6 +419,12 @@ tr:hover td{background:rgba(255,255,255,.03)}
           <div class="form-group"><label>Tipo</label>
             <select id="fac-tipo"><option value="venta">Venta</option><option value="compra">Compra</option></select>
           </div>
+        </div>
+        <div class="form-group" id="fac-maestro-row">
+          <label>Cliente / Proveedor</label>
+          <select id="fac-maestro-sel" onchange="fillFromMaestro(this.value)" style="width:100%">
+            <option value="">— Seleccioná o completá manualmente abajo —</option>
+          </select>
         </div>
         <div class="form-row">
           <div class="form-group"><label>CUIT</label><input id="fac-cuit" type="text" placeholder="XX-XXXXXXXX-X"></div>
@@ -535,6 +562,34 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-retencion')">Cancelar</button>
       <button id="ret-save-btn" class="btn btn-primary" onclick="saveRetencion()">Guardar</button>
+    </div>
+  </div>
+
+  <!-- MODAL MAESTRO -->
+  <div id="modal-maestro" class="modal" style="display:none">
+    <div class="modal-header"><h3 id="maestro-modal-title">Nuevo Contacto</h3><button class="modal-close" onclick="closeModal('modal-maestro')">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label>Tipo</label>
+          <select id="m-tipo"><option value="cliente">Cliente</option><option value="proveedor">Proveedor</option></select>
+        </div>
+        <div class="form-group"><label>Condición IVA</label>
+          <select id="m-condiva"><option value="responsable_inscripto">Responsable Inscripto</option><option value="monotributo">Monotributo</option><option value="exento">Exento</option><option value="consumidor_final">Consumidor Final</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Razón Social</label><input id="m-razon" type="text" placeholder="Nombre o razón social"></div>
+        <div class="form-group"><label>CUIT</label><input id="m-cuit" type="text" placeholder="XX-XXXXXXXX-X"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Email</label><input id="m-email" type="email" placeholder="Opcional"></div>
+        <div class="form-group"><label>Teléfono</label><input id="m-tel" type="text" placeholder="Opcional"></div>
+      </div>
+      <div class="form-group"><label>Notas</label><textarea id="m-notas"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-maestro')">Cancelar</button>
+      <button id="m-save-btn" class="btn btn-primary" onclick="saveMaestro()">Guardar</button>
     </div>
   </div>
 
@@ -722,6 +777,7 @@ function navigate(section) {
   if (section === 'cc-clientes') loadAndRenderCCClientes();
   if (section === 'cc-proveedores') loadAndRenderCCProveedores();
   if (section === 'gastos') loadAndRenderGastos();
+  if (section === 'maestro') loadAndRenderMaestro();
 }
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
 function switchTab(section, tab, el) {
@@ -907,6 +963,9 @@ function openFacturaModal() {
   document.getElementById('fac-ai-info').style.display='none';
   document.getElementById('fac-dup-warning').style.display='none';
   document.getElementById('fac-file').value='';
+  document.getElementById('fac-maestro-sel').value='';
+  if (!_maestro.length) sheetsGet('MAESTRO').then(d=>{_maestro=d;populateMaestroSelect();});
+  else populateMaestroSelect();
   openModal('modal-factura');
 }
 async function handleFacturaDrop(e) {
@@ -1529,6 +1588,78 @@ function renderCCProveedores() {
       </div>
     </div>`;
   }).join('');
+}
+
+// ─── MAESTRO ─────────────────────────────────────────────────────
+let _maestro = [];
+async function loadAndRenderMaestro() {
+  _maestro = await sheetsGet('MAESTRO');
+  renderMaestro('cliente');
+  renderMaestro('proveedor');
+  populateMaestroSelect();
+}
+function renderMaestro(tipo) {
+  const tbodyId = tipo==='cliente' ? 'm-tbody-cli' : 'm-tbody-prov';
+  const searchId = tipo==='cliente' ? 'm-search-cli' : 'm-search-prov';
+  const q = (document.getElementById(searchId)?.value||'').toLowerCase();
+  const rows = _maestro.filter(r => String(r[3]).toLowerCase()===tipo && (!q || String(r[1]).toLowerCase().includes(q) || String(r[2]).toLowerCase().includes(q)));
+  const tbody = document.getElementById(tbodyId);
+  const condLabel = {responsable_inscripto:'Resp. Inscripto', monotributo:'Monotributo', exento:'Exento', consumidor_final:'Cons. Final'};
+  tbody.innerHTML = rows.length ? rows.map(r => `<tr>
+    <td><strong>${r[1]}</strong></td>
+    <td style="font-size:12px">${r[2]}</td>
+    <td><span style="font-size:11px;background:var(--bg-3);padding:2px 7px;border-radius:12px">${condLabel[r[4]]||r[4]||'-'}</span></td>
+    <td style="font-size:12px">${r[5]||'-'}</td>
+    <td style="font-size:12px">${r[6]||'-'}</td>
+    <td style="font-size:12px;color:var(--text-muted)">${r[7]||''}</td>
+    <td>${currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteMaestro('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}</td>
+  </tr>`).join('') : `<tr class="empty-row"><td colspan="7">Sin ${tipo}s registrados</td></tr>`;
+}
+function populateMaestroSelect() {
+  const sel = document.getElementById('fac-maestro-sel');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Seleccioná o completá manualmente abajo —</option>';
+  const sorted = [..._maestro].sort((a,b)=>String(a[1]).localeCompare(String(b[1])));
+  sorted.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r[2]; opt.dataset.razon = r[1]; opt.dataset.tipo = r[3];
+    opt.textContent = `${r[1]} · ${r[2]} · ${r[3]==='cliente'?'Cliente':'Proveedor'}`;
+    sel.appendChild(opt);
+  });
+}
+function fillFromMaestro(cuit) {
+  if (!cuit) return;
+  const opt = document.querySelector(`#fac-maestro-sel option[value="${cuit}"]`);
+  if (!opt) return;
+  document.getElementById('fac-cuit').value = cuit;
+  document.getElementById('fac-razon').value = opt.dataset.razon||'';
+  if (opt.dataset.tipo) document.getElementById('fac-tipo').value = opt.dataset.tipo==='cliente'?'venta':'compra';
+}
+function openMaestroModal(tipo='cliente') {
+  document.getElementById('maestro-modal-title').textContent = 'Nuevo Contacto';
+  ['m-razon','m-cuit','m-email','m-tel','m-notas'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('m-tipo').value = tipo;
+  document.getElementById('m-condiva').value = 'responsable_inscripto';
+  document.getElementById('m-save-btn').disabled = false;
+  openModal('modal-maestro');
+}
+async function saveMaestro() {
+  const btn = document.getElementById('m-save-btn'); btn.disabled=true;
+  const razon = document.getElementById('m-razon').value.trim();
+  const cuit = document.getElementById('m-cuit').value.trim();
+  if (!razon||!cuit) { toast('Razón social y CUIT son obligatorios','error'); btn.disabled=false; return; }
+  const id = 'M'+Date.now();
+  const row = [id, razon, cuit, document.getElementById('m-tipo').value, document.getElementById('m-condiva').value, document.getElementById('m-email').value.trim(), document.getElementById('m-tel').value.trim(), document.getElementById('m-notas').value.trim()];
+  try {
+    await sheetsAppend('MAESTRO',[row]); _maestro.push(row);
+    renderMaestro('cliente'); renderMaestro('proveedor'); populateMaestroSelect();
+    closeModal('modal-maestro'); toast('Contacto guardado');
+  } catch(e) { toast('Error: '+e.message,'error'); btn.disabled=false; }
+}
+async function deleteMaestro(id) {
+  if (!confirm('¿Eliminar este contacto?')) return;
+  await sheetsDelete('MAESTRO',id); _maestro=_maestro.filter(r=>r[0]!==id);
+  renderMaestro('cliente'); renderMaestro('proveedor'); populateMaestroSelect(); toast('Contacto eliminado');
 }
 
 // ─── GASTOS ──────────────────────────────────────────────────────
