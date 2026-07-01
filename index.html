@@ -450,10 +450,17 @@ tr:hover td{background:rgba(255,255,255,.03)}
   <div id="modal-cobro" class="modal" style="display:none">
     <div class="modal-header"><h3>Nuevo Cobro / Recibo de Cliente</h3><button class="modal-close" onclick="closeModal('modal-cobro')">×</button></div>
     <div class="modal-body">
-      <div class="form-group"><label>Fecha</label><input id="co-fecha" type="date"></div>
-      <div class="form-group">
-        <label>Facturas a cobrar</label>
-        <div id="co-facturas-list" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--bg-2)"></div>
+      <div class="form-row">
+        <div class="form-group"><label>Fecha</label><input id="co-fecha" type="date"></div>
+        <div class="form-group"><label>Cliente</label>
+          <select id="co-cliente" onchange="filtrarFacturasPorCliente()" style="width:100%">
+            <option value="">— Seleccioná cliente —</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" id="co-facturas-group" style="display:none">
+        <label>Facturas pendientes</label>
+        <div id="co-facturas-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--bg-2)"></div>
         <div style="text-align:right;font-size:12px;color:var(--text-muted);margin-top:4px">Total seleccionado: <strong id="co-total-fac">$0</strong></div>
       </div>
       <div class="form-group">
@@ -1116,10 +1123,21 @@ function populateFacturasSelect(selId, tipo) {
   const opts = _facturas.filter(r => String(r[5]).toLowerCase()===tipo && ['pendiente','parcial'].includes(String(r[10]).toLowerCase()));
   sel.innerHTML = '<option value="">Seleccioná factura...</option>' + opts.map(r => `<option value="${r[2]}" data-id="${r[0]}" data-cuit="${r[3]}" data-razon="${r[4]}" data-total="${r[9]}">${r[2]} · ${r[4]} · ${fmtARS(r[9])}</option>`).join('');
 }
-function populateCoFacturas() {
-  const opts = _facturas.filter(r => String(r[5]).toLowerCase()==='venta' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase()));
+function populateCoClientes() {
+  const pendientes = _facturas.filter(r => String(r[5]).toLowerCase()==='venta' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase()));
+  const clientes = [...new Map(pendientes.map(r => [r[4], {razon:r[4], cuit:r[3]}])).values()].sort((a,b)=>a.razon.localeCompare(b.razon));
+  const sel = document.getElementById('co-cliente');
+  sel.innerHTML = '<option value="">— Seleccioná cliente —</option>' + clientes.map(c=>`<option value="${c.cuit}" data-razon="${c.razon}">${c.razon}</option>`).join('');
+}
+function filtrarFacturasPorCliente() {
+  const cuit = document.getElementById('co-cliente').value;
+  const group = document.getElementById('co-facturas-group');
+  if (!cuit) { group.style.display='none'; updateCoSaldo(); return; }
+  const opts = _facturas.filter(r => String(r[5]).toLowerCase()==='venta' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase()) && r[3]===cuit);
   const list = document.getElementById('co-facturas-list');
-  list.innerHTML = opts.length ? opts.map(r => `<label style="display:flex;align-items:center;gap:8px;padding:5px 2px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"><input type="checkbox" class="co-fac-cb" value="${r[2]}" data-id="${r[0]}" data-cuit="${r[3]}" data-razon="${r[4]}" data-total="${r[9]}" onchange="updateCoSaldo()"> <span>${r[2]} · <strong>${r[4]}</strong> · ${fmtARS(r[9])}</span></label>`).join('') : '<p style="color:var(--text-muted);font-size:13px;margin:0">No hay facturas pendientes</p>';
+  list.innerHTML = opts.length ? opts.map(r=>`<label style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"><input type="checkbox" class="co-fac-cb" value="${r[2]}" data-id="${r[0]}" data-cuit="${r[3]}" data-razon="${r[4]}" data-total="${r[9]}" onchange="updateCoSaldo()"> <span style="flex:1">${r[2]} · <span style="color:var(--text-muted);font-size:12px">${d(r[1])}</span></span><strong>${fmtARS(r[9])}</strong></label>`).join('') : '<p style="color:var(--text-muted);font-size:13px;margin:0">No hay facturas pendientes para este cliente</p>';
+  group.style.display = 'block';
+  updateCoSaldo();
 }
 function addRetCobro() {
   const idx = Date.now();
@@ -1213,8 +1231,10 @@ function openCobrosModal() {
   document.querySelector('input[name="co-medio"][value="transferencia"]').checked = true;
   _coRetenciones = [];
   document.getElementById('co-ret-list').innerHTML = '';
+  document.getElementById('co-facturas-group').style.display = 'none';
+  document.getElementById('co-facturas-list').innerHTML = '';
   toggleCoMedio();
-  populateCoFacturas();
+  populateCoClientes();
   updateCoSaldo();
   openModal('modal-cobro');
 }
