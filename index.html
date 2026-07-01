@@ -981,11 +981,17 @@ function showDetalleFactura(r) {
   openModal('modal-detalle');
 }
 async function deleteFactura(id) {
-  if (!confirm('¿Eliminar esta factura?')) return;
+  const fac = _facturas.find(r => r[0] === id);
+  const folio = fac ? String(fac[2]) : null;
+  const cobrosAsoc = folio ? _cobros.filter(r => { try { return JSON.parse(r[2]).includes(folio); } catch { return String(r[2]).includes(folio); } }) : [];
+  const msg = cobrosAsoc.length ? `¿Eliminar esta factura y sus ${cobrosAsoc.length} cobro(s) asociado(s)?` : '¿Eliminar esta factura?';
+  if (!confirm(msg)) return;
   await sheetsDelete('FACTURAS', id);
   _facturas = _facturas.filter(r => r[0] !== id);
+  for (const c of cobrosAsoc) { await sheetsDelete('COBROS', c[0]); }
+  _cobros = _cobros.filter(r => !cobrosAsoc.find(c => c[0] === r[0]));
   renderFacturas();
-  toast('Factura eliminada');
+  toast('Factura eliminada' + (cobrosAsoc.length ? ` (+ ${cobrosAsoc.length} cobro(s))` : ''));
 }
 function calcIVA() {
   const neto = Number(document.getElementById('fac-neto').value)||0;
@@ -1724,7 +1730,7 @@ function renderCCClientes() {
         </tbody></table></div>
         <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Cobros</p>
         <div class="table-wrap" style="margin-bottom:12px"><table><thead><tr><th>Fecha</th><th>Factura</th><th>Monto</th><th>Medio</th></tr></thead><tbody>
-          ${c.cobros.length?c.cobros.map(r=>`<tr><td>${d(r[1])}</td><td>${r[2]}</td><td>${fmtARS(r[5])}</td><td>${r[6]}</td></tr>`).join(''):'<tr class="empty-row"><td colspan="4">Sin cobros</td></tr>'}
+          ${c.cobros.length?c.cobros.map(r=>`<tr><td>${d(r[1])}</td><td style="font-size:12px">${(()=>{try{return JSON.parse(r[2]).join(', ');}catch{return r[2];}})()}</td><td>${fmtARS(r[5])}</td><td>${r[6]}</td></tr>`).join(''):'<tr class="empty-row"><td colspan="4">Sin cobros</td></tr>'}
         </tbody></table></div>
         <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Retenciones recibidas</p>
         <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Nro</th><th>Tipo</th><th>Monto</th></tr></thead><tbody>
