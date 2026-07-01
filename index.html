@@ -367,7 +367,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
     </div>
     <div id="tab-maestro-proveedores" class="tab-panel">
       <div class="filters"><input id="m-search-prov" type="text" placeholder="Buscar por nombre o CUIT..." oninput="renderMaestro('proveedor')" style="padding:7px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;width:260px"></div>
-      <div class="table-wrap"><table><thead><tr><th>Razón Social</th><th>CUIT</th><th>Cond. IVA</th><th>Email</th><th>Teléfono</th><th>Notas</th><th></th></tr></thead><tbody id="m-tbody-prov"></tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>Razón Social</th><th>CUIT</th><th>Cond. IVA</th><th>Email</th><th>Teléfono</th><th>Banco</th><th>CBU / Alias</th><th>Notas</th><th></th></tr></thead><tbody id="m-tbody-prov"></tbody></table></div>
     </div>
   </div>
 
@@ -571,7 +571,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="modal-body">
       <div class="form-row">
         <div class="form-group"><label>Tipo</label>
-          <select id="m-tipo"><option value="cliente">Cliente</option><option value="proveedor">Proveedor</option></select>
+          <select id="m-tipo" onchange="toggleMaestroTipo()"><option value="cliente">Cliente</option><option value="proveedor">Proveedor</option></select>
         </div>
         <div class="form-group"><label>Condición IVA</label>
           <select id="m-condiva"><option value="responsable_inscripto">Responsable Inscripto</option><option value="monotributo">Monotributo</option><option value="exento">Exento</option><option value="consumidor_final">Consumidor Final</option></select>
@@ -584,6 +584,20 @@ tr:hover td{background:rgba(255,255,255,.03)}
       <div class="form-row">
         <div class="form-group"><label>Email</label><input id="m-email" type="email" placeholder="Opcional"></div>
         <div class="form-group"><label>Teléfono</label><input id="m-tel" type="text" placeholder="Opcional"></div>
+      </div>
+      <div id="m-banco-fields" style="display:none">
+        <div style="font-size:12px;color:var(--text-muted);margin:8px 0 4px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Datos bancarios</div>
+        <div class="form-row">
+          <div class="form-group"><label>Banco</label><input id="m-banco" type="text" placeholder="Ej: Santander"></div>
+          <div class="form-group"><label>Tipo de cuenta</label>
+            <select id="m-tipocuenta"><option value="caja_ahorro">Caja de Ahorro</option><option value="corriente">Cuenta Corriente</option></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>CBU</label><input id="m-cbu" type="text" placeholder="22 dígitos"></div>
+          <div class="form-group"><label>Alias</label><input id="m-alias" type="text" placeholder="alias.banco.cbu"></div>
+        </div>
+        <div class="form-group"><label>Titular (si difiere de la razón social)</label><input id="m-titular" type="text" placeholder="Opcional"></div>
       </div>
       <div class="form-group"><label>Notas</label><textarea id="m-notas"></textarea></div>
     </div>
@@ -1605,15 +1619,17 @@ function renderMaestro(tipo) {
   const rows = _maestro.filter(r => String(r[3]).toLowerCase()===tipo && (!q || String(r[1]).toLowerCase().includes(q) || String(r[2]).toLowerCase().includes(q)));
   const tbody = document.getElementById(tbodyId);
   const condLabel = {responsable_inscripto:'Resp. Inscripto', monotributo:'Monotributo', exento:'Exento', consumidor_final:'Cons. Final'};
+  const esProv = tipo === 'proveedor';
   tbody.innerHTML = rows.length ? rows.map(r => `<tr>
     <td><strong>${r[1]}</strong></td>
     <td style="font-size:12px">${r[2]}</td>
     <td><span style="font-size:11px;background:var(--bg-3);padding:2px 7px;border-radius:12px">${condLabel[r[4]]||r[4]||'-'}</span></td>
     <td style="font-size:12px">${r[5]||'-'}</td>
     <td style="font-size:12px">${r[6]||'-'}</td>
+    ${esProv?`<td style="font-size:12px">${r[8]||'-'}</td><td style="font-size:12px">${r[9]?`<span style="font-family:monospace">${r[9]}</span>`:''}${r[10]?`<br><small style="color:var(--text-muted)">${r[10]}</small>`:''}</td>`:''}
     <td style="font-size:12px;color:var(--text-muted)">${r[7]||''}</td>
     <td>${currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteMaestro('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}</td>
-  </tr>`).join('') : `<tr class="empty-row"><td colspan="7">Sin ${tipo}s registrados</td></tr>`;
+  </tr>`).join('') : `<tr class="empty-row"><td colspan="${esProv?9:7}">Sin ${tipo}s registrados</td></tr>`;
 }
 function populateMaestroSelect() {
   const sel = document.getElementById('fac-maestro-sel');
@@ -1635,12 +1651,18 @@ function fillFromMaestro(cuit) {
   document.getElementById('fac-razon').value = opt.dataset.razon||'';
   if (opt.dataset.tipo) document.getElementById('fac-tipo').value = opt.dataset.tipo==='cliente'?'venta':'compra';
 }
+function toggleMaestroTipo() {
+  const esProv = document.getElementById('m-tipo').value === 'proveedor';
+  document.getElementById('m-banco-fields').style.display = esProv ? 'block' : 'none';
+}
 function openMaestroModal(tipo='cliente') {
   document.getElementById('maestro-modal-title').textContent = 'Nuevo Contacto';
-  ['m-razon','m-cuit','m-email','m-tel','m-notas'].forEach(id=>document.getElementById(id).value='');
+  ['m-razon','m-cuit','m-email','m-tel','m-notas','m-banco','m-cbu','m-alias','m-titular'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('m-tipo').value = tipo;
   document.getElementById('m-condiva').value = 'responsable_inscripto';
+  document.getElementById('m-tipocuenta').value = 'caja_ahorro';
   document.getElementById('m-save-btn').disabled = false;
+  toggleMaestroTipo();
   openModal('modal-maestro');
 }
 async function saveMaestro() {
@@ -1649,7 +1671,8 @@ async function saveMaestro() {
   const cuit = document.getElementById('m-cuit').value.trim();
   if (!razon||!cuit) { toast('Razón social y CUIT son obligatorios','error'); btn.disabled=false; return; }
   const id = 'M'+Date.now();
-  const row = [id, razon, cuit, document.getElementById('m-tipo').value, document.getElementById('m-condiva').value, document.getElementById('m-email').value.trim(), document.getElementById('m-tel').value.trim(), document.getElementById('m-notas').value.trim()];
+  const esProv = document.getElementById('m-tipo').value === 'proveedor';
+  const row = [id, razon, cuit, document.getElementById('m-tipo').value, document.getElementById('m-condiva').value, document.getElementById('m-email').value.trim(), document.getElementById('m-tel').value.trim(), document.getElementById('m-notas').value.trim(), esProv?document.getElementById('m-banco').value.trim():'', esProv?document.getElementById('m-cbu').value.trim():'', esProv?document.getElementById('m-alias').value.trim():'', esProv?document.getElementById('m-tipocuenta').value:'', esProv?document.getElementById('m-titular').value.trim():''];
   try {
     await sheetsAppend('MAESTRO',[row]); _maestro.push(row);
     renderMaestro('cliente'); renderMaestro('proveedor'); populateMaestroSelect();
