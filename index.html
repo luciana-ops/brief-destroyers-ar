@@ -421,12 +421,6 @@ tr:hover td{background:rgba(255,255,255,.03)}
             <select id="fac-tipo"><option value="venta">Venta</option><option value="compra">Compra</option></select>
           </div>
         </div>
-        <div class="form-group" id="fac-maestro-row">
-          <label>Cliente / Proveedor</label>
-          <select id="fac-maestro-sel" onchange="fillFromMaestro(this.value)" style="width:100%">
-            <option value="">— Seleccioná o completá manualmente abajo —</option>
-          </select>
-        </div>
         <div class="form-row">
           <div class="form-group"><label>CUIT</label><input id="fac-cuit" type="text" placeholder="XX-XXXXXXXX-X"></div>
           <div class="form-group"><label>Razón Social</label><input id="fac-razon" type="text"></div>
@@ -1221,10 +1215,6 @@ function openCobrosModal() {
   document.getElementById('co-monto').value = '';
   document.getElementById('co-notas').value = '';
   document.getElementById('co-nop').value = '';
-  document.getElementById('co-banco').value = '';
-  document.getElementById('co-nrocheque').value = '';
-  document.getElementById('co-vencimiento').value = '';
-  document.querySelector('input[name="co-medio"][value="transferencia"]').checked = true;
   _coRetenciones = [];
   _coCheques = [];
   document.getElementById('co-ret-list').innerHTML = '';
