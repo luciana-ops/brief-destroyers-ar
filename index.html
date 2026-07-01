@@ -830,8 +830,8 @@ function renderDashboard() {
     if (month && fd.substring(5,7) !== month) return false;
     return true;
   });
-  const ventasRows = rows.filter(r => String(r[5]).toLowerCase() === 'venta' && String(r[6]).toUpperCase() !== 'NC');
-  const comprasRows = rows.filter(r => String(r[5]).toLowerCase() === 'compra' && String(r[6]).toUpperCase() !== 'NC');
+  const ventasRows = rows.filter(r => String(r[5]).toLowerCase() === 'venta' && String(r[6]).toUpperCase() !== 'NC' && String(r[10]).toLowerCase() !== 'anulada');
+  const comprasRows = rows.filter(r => String(r[5]).toLowerCase() === 'compra' && String(r[6]).toUpperCase() !== 'NC' && String(r[10]).toLowerCase() !== 'anulada');
   const sum = (arr, col) => arr.reduce((s,r) => s + Number(r[col]||0), 0);
   const ventasNeto = sum(ventasRows, 7);
   const comprasNeto = sum(comprasRows, 7);
@@ -988,7 +988,7 @@ async function processFacturaFile(file) {
   try {
     const base64 = await fileToBase64(file);
     const mediaType = file.type === 'application/pdf' ? 'application/pdf' : file.type;
-    const prompt = `Extraé del comprobante en JSON estricto (sin markdown): numero_folio, fecha (YYYY-MM-DD), cuit_emisor (formato XX-XXXXXXXX-X), razon_emisor, cuit_receptor (formato XX-XXXXXXXX-X), razon_receptor, tipo_comprobante (A/B/C/NC), monto_neto (número sin formato), iva (número), total (número), es_nota_credito (boolean), folio_referencia (string o null si no aplica). Solo JSON.`;
+    const prompt = `Extraé del comprobante en JSON estricto (sin markdown): numero_folio, fecha (YYYY-MM-DD), cuit_emisor (formato XX-XXXXXXXX-X), razon_emisor, cuit_receptor (formato XX-XXXXXXXX-X), razon_receptor, tipo_comprobante (A/B/C/NC), monto_neto (número sin formato — para Factura C sin IVA, monto_neto es igual al total), iva (número — 0 para Factura C de monotributista), total (número), es_nota_credito (boolean), folio_referencia (string o null si no aplica). Solo JSON.`;
     const raw = await callClaude(base64, mediaType, prompt);
     const json = JSON.parse(raw.replace(/```json\n?|\n?```/g,'').trim());
     fillFacturaForm(json);
