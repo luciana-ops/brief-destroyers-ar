@@ -572,16 +572,10 @@ const WTF_CUIT = '30-71762312-2';
 const IVA_RATE = 0.21;
 let TC = 1200;
 let currentUser = null;
+let LOGO_DATA_URL = null;
+fetch('Brief-Destroyer-Black.png').then(r=>r.blob()).then(blob=>new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.readAsDataURL(blob);})).then(url=>{LOGO_DATA_URL=url;}).catch(()=>{});
 function addLogoToPDF(doc) {
-  try {
-    const img = document.querySelector('img[src="Brief-Destroyer-Black.png"]');
-    if (!img || !img.complete) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = img.naturalWidth || 400;
-    canvas.height = img.naturalHeight || 120;
-    canvas.getContext('2d').drawImage(img, 0, 0);
-    doc.addImage(canvas.toDataURL('image/png'), 'PNG', 14, 8, 50, 15);
-  } catch(e) {}
+  try { if (LOGO_DATA_URL) doc.addImage(LOGO_DATA_URL,'PNG',14,8,50,15); } catch(e) {}
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────
