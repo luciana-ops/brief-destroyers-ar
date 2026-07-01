@@ -251,7 +251,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
       <select id="f-year" onchange="renderFacturas()"></select>
       <select id="f-month" onchange="renderFacturas()"><option value="">Todos los meses</option><option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option><option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option><option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option></select>
       <select id="f-tipo" onchange="renderFacturas()"><option value="">Venta + Compra</option><option value="venta">Ventas</option><option value="compra">Compras</option></select>
-      <select id="f-tipodoc" onchange="renderFacturas()"><option value="">Todos los doc.</option><option value="A">Factura A</option><option value="B">Factura B</option><option value="NC">Nota de Crédito</option></select>
+      <select id="f-tipodoc" onchange="renderFacturas()"><option value="">Todos los doc.</option><option value="A">Factura A</option><option value="B">Factura B</option><option value="C">Factura C</option><option value="NC">Nota de Crédito</option></select>
       <select id="f-estado" onchange="renderFacturas()"><option value="">Todos los estados</option><option value="pendiente">Pendiente</option><option value="cobrada">Cobrada</option><option value="pagada">Pagada</option><option value="parcial">Parcial</option><option value="anulada">Anulada</option></select>
       <input id="f-cliente" type="text" placeholder="Filtrar por cliente..." oninput="renderFacturas()" style="padding:7px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;width:200px">
       <button class="btn btn-secondary btn-sm" onclick="exportFacturasExcel()"><i class="fa-solid fa-file-excel"></i> Excel</button>
@@ -415,7 +415,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
         </div>
         <div class="form-row">
           <div class="form-group"><label>Tipo doc.</label>
-            <select id="fac-tipodoc"><option value="A">Factura A</option><option value="B">Factura B</option><option value="NC">Nota de Crédito</option></select>
+            <select id="fac-tipodoc" onchange="calcIVA()"><option value="A">Factura A</option><option value="B">Factura B</option><option value="C">Factura C</option><option value="NC">Nota de Crédito</option></select>
           </div>
           <div class="form-group"><label>Tipo</label>
             <select id="fac-tipo"><option value="venta">Venta</option><option value="compra">Compra</option></select>
@@ -427,7 +427,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
         </div>
         <div class="form-row">
           <div class="form-group"><label>Neto</label><input id="fac-neto" type="number" step="0.01" oninput="calcIVA()"></div>
-          <div class="form-group"><label>IVA (21%)</label><input id="fac-iva" type="number" step="0.01"></div>
+          <div class="form-group"><label id="fac-iva-label">IVA (21%)</label><input id="fac-iva" type="number" step="0.01"></div>
         </div>
         <div class="form-group"><label>Total</label><input id="fac-total" type="number" step="0.01"></div>
         <div id="fac-nc-ref-group" class="form-group" style="display:none"><label>Folio que anula (NC)</label><input id="fac-nc-ref" type="text"></div>
@@ -960,8 +960,12 @@ async function deleteFactura(id) {
 }
 function calcIVA() {
   const neto = Number(document.getElementById('fac-neto').value)||0;
-  document.getElementById('fac-iva').value = (neto * IVA_RATE).toFixed(2);
-  document.getElementById('fac-total').value = (neto * (1+IVA_RATE)).toFixed(2);
+  const tipoDoc = document.getElementById('fac-tipodoc').value;
+  const sinIVA = tipoDoc === 'C' || tipoDoc === 'NC';
+  document.getElementById('fac-iva-label').textContent = sinIVA ? 'IVA (0% — sin IVA)' : 'IVA (21%)';
+  document.getElementById('fac-iva').value = sinIVA ? '0' : (neto * IVA_RATE).toFixed(2);
+  document.getElementById('fac-iva').readOnly = sinIVA;
+  document.getElementById('fac-total').value = sinIVA ? neto.toFixed(2) : (neto * (1+IVA_RATE)).toFixed(2);
 }
 function openFacturaModal() {
   document.getElementById('fac-step1').style.display='block';
