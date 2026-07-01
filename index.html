@@ -308,11 +308,13 @@ tr:hover td{background:rgba(255,255,255,.03)}
       <select id="r-year" onchange="renderRetenciones()"></select>
       <select id="r-month" onchange="renderRetenciones()"><option value="">Todos los meses</option><option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option><option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option><option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option></select>
       <select id="r-tipo" onchange="renderRetenciones()"><option value="">Todos los tipos</option><option value="ganancias">Ganancias</option><option value="iibb">IIBB</option><option value="suss">SUSS</option><option value="otro">Otro</option></select>
+      <button id="r-vista-btn" class="btn btn-secondary btn-sm" onclick="toggleRetView()"><i class="fa-solid fa-layer-group"></i> Por cliente</button>
       <button class="btn btn-secondary btn-sm" onclick="exportRetencionesExcel()"><i class="fa-solid fa-file-excel"></i> Excel</button>
     </div>
     <div class="table-wrap">
-      <table><thead><tr><th>Fecha</th><th>Nro</th><th>Agente</th><th>Tipo</th><th>Monto</th><th>Folios</th><th>Notas</th><th></th></tr></thead>
+      <table id="r-table"><thead><tr><th>Fecha</th><th>Nro</th><th>Agente</th><th>Tipo</th><th>Monto</th><th>Folios</th><th>Notas</th><th></th></tr></thead>
       <tbody id="r-tbody"></tbody></table>
+      <div id="r-grouped" style="display:none"></div>
     </div>
   </div>
 
@@ -428,7 +430,12 @@ tr:hover td{background:rgba(255,255,255,.03)}
         <div style="text-align:right;font-size:12px;color:var(--text-muted);margin-top:4px">Total seleccionado: <strong id="co-total-fac">$0</strong></div>
       </div>
       <div class="form-group">
-        <label>Retenciones &nbsp;<button type="button" onclick="addRetCobro()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:2px 10px;border-radius:6px;cursor:pointer;font-size:12px">+ Agregar</button></label>
+        <label>Retenciones &nbsp;<button type="button" onclick="addRetCobro()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:2px 10px;border-radius:6px;cursor:pointer;font-size:12px">+ Manual</button></label>
+        <div id="co-ret-dropzone" ondragover="event.preventDefault();this.style.borderColor='var(--accent)'" ondragleave="this.style.borderColor='var(--border)'" ondrop="handleCoRetDrop(event)" onclick="document.getElementById('co-ret-file').click()" style="border:2px dashed var(--border);border-radius:8px;padding:10px;text-align:center;color:var(--text-muted);font-size:12px;cursor:pointer;margin-bottom:6px;transition:border-color .2s">
+          <i class="fa-solid fa-file-arrow-up"></i> Arrastrá certificados de retención (PDF/imagen) — la IA los lee automáticamente
+          <span id="co-ret-loading" style="display:none;margin-left:8px"><i class="fa-solid fa-spinner fa-spin"></i> Leyendo...</span>
+        </div>
+        <input type="file" id="co-ret-file" style="display:none" accept=".pdf,.png,.jpg,.jpeg,.webp" multiple onchange="handleCoRetFileInput(this)">
         <div id="co-ret-list"></div>
         <div style="text-align:right;font-size:12px;color:var(--text-muted);margin-top:4px">Total retenciones: <strong id="co-total-ret">$0</strong></div>
       </div>
@@ -1056,6 +1063,38 @@ function setRetNro(idx,v){ const r=_coRetenciones.find(x=>x.idx===idx); if(r) r.
 function setRetTipo(idx,v){ const r=_coRetenciones.find(x=>x.idx===idx); if(r) r.obj.tipo=v; }
 function setRetMonto(idx,v){ const r=_coRetenciones.find(x=>x.idx===idx); if(r){ r.obj.monto=Number(v)||0; updateCoSaldo(); } }
 function removeRetCobro(idx){ _coRetenciones=_coRetenciones.filter(x=>x.idx!==idx); const el=document.getElementById('co-ret-'+idx); if(el) el.remove(); updateCoSaldo(); }
+async function handleCoRetDrop(e) {
+  e.preventDefault(); e.stopPropagation();
+  document.getElementById('co-ret-dropzone').style.borderColor='var(--border)';
+  const files = Array.from(e.dataTransfer.files);
+  for (const f of files) await processRetencionFileCobro(f);
+}
+async function handleCoRetFileInput(input) {
+  const files = Array.from(input.files);
+  for (const f of files) await processRetencionFileCobro(f);
+  input.value='';
+}
+async function processRetencionFileCobro(file) {
+  const loading = document.getElementById('co-ret-loading');
+  loading.style.display = 'inline';
+  try {
+    const base64 = await fileToBase64(file);
+    const mediaType = file.type==='application/pdf'?'application/pdf':file.type;
+    const prompt = `Extraé del certificado de retención en JSON estricto (sin markdown): nro_retencion, tipo_retencion (ganancias/iibb/suss/otro), monto (número). Solo JSON.`;
+    const raw = await callClaude(base64, mediaType, prompt);
+    const j = JSON.parse(raw.replace(/```json\n?|\n?```/g,'').trim());
+    addRetCobro();
+    const last = _coRetenciones[_coRetenciones.length-1];
+    last.obj.nro = j.nro_retencion||'';
+    last.obj.tipo = j.tipo_retencion||'otro';
+    last.obj.monto = Number(j.monto)||0;
+    const row = document.getElementById('co-ret-'+last.idx);
+    if (row) { const ins=row.querySelectorAll('input'); ins[0].value=last.obj.nro; ins[1].value=last.obj.tipo; ins[2].value=last.obj.monto||''; }
+    updateCoSaldo();
+    toast('Retención leída: '+last.obj.tipo+' '+fmtARS(last.obj.monto));
+  } catch(e) { toast('Error leyendo certificado: '+e.message,'error'); }
+  finally { loading.style.display='none'; }
+}
 function updateCoSaldo() {
   const cbs = Array.from(document.querySelectorAll('.co-fac-cb:checked'));
   const totalFac = cbs.reduce((s,cb)=>s+Number(cb.dataset.total||0),0);
@@ -1260,10 +1299,20 @@ function generarPDFOrdenPago(data) {
 
 // ─── RETENCIONES ─────────────────────────────────────────────────
 let _retenciones = [];
+let _retView = 'tabla';
+function toggleRetView() {
+  _retView = _retView==='tabla' ? 'clientes' : 'tabla';
+  const btn = document.getElementById('r-vista-btn');
+  btn.innerHTML = _retView==='tabla' ? '<i class="fa-solid fa-layer-group"></i> Por cliente' : '<i class="fa-solid fa-table"></i> Tabla';
+  document.getElementById('r-table').style.display = _retView==='tabla' ? '' : 'none';
+  document.getElementById('r-grouped').style.display = _retView==='clientes' ? '' : 'none';
+  renderRetenciones();
+}
 async function loadAndRenderRetenciones() {
   _retenciones = await sheetsGet('RETENCIONES');
   renderRetenciones();
 }
+const MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 function renderRetenciones() {
   const year=getFilter('r-year'),month=getFilter('r-month'),tipo=getFilter('r-tipo');
   const rows=_retenciones.filter(r=>{
@@ -1273,8 +1322,48 @@ function renderRetenciones() {
     if(tipo&&String(r[5]).toLowerCase()!==tipo)return false;
     return true;
   });
+  if (_retView==='clientes') { renderRetencionesAgrupadas(rows); return; }
   const tbody=document.getElementById('r-tbody');
-  tbody.innerHTML=rows.length?rows.map(r=>`<tr><td>${d(r[1])}</td><td>${r[2]}</td><td>${r[4]}<br><small style="color:var(--muted)">${r[3]}</small></td><td>${badge(r[5],''+r[5])}</td><td>${fmtARS(r[6])}</td><td style="font-size:12px;color:var(--muted)">${r[7]||''}</td><td style="font-size:12px">${r[8]||''}</td><td>${currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteRetencion('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`).join(''):'<tr class="empty-row"><td colspan="8">Sin retenciones registradas</td></tr>';
+  tbody.innerHTML=rows.length?rows.map(r=>`<tr><td>${d(r[1])}</td><td>${r[2]}</td><td>${r[4]}<br><small style="color:var(--text-muted)">${r[3]}</small></td><td>${badge(r[5],''+r[5])}</td><td>${fmtARS(r[6])}</td><td style="font-size:12px;color:var(--text-muted)">${r[7]||''}</td><td style="font-size:12px">${r[8]||''}</td><td>${currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteRetencion('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`).join(''):'<tr class="empty-row"><td colspan="8">Sin retenciones registradas</td></tr>';
+}
+function renderRetencionesAgrupadas(rows) {
+  const byCliente = {};
+  rows.forEach(r => {
+    const cliente = r[4]||'Sin cliente';
+    const fd = d(r[1]); const mm = fd.substring(5,7); const yy = fd.substring(0,4);
+    const mesKey = yy+'-'+mm;
+    const mesLabel = (MESES[parseInt(mm)]||mm)+' '+yy;
+    if (!byCliente[cliente]) byCliente[cliente] = {total:0, meses:{}};
+    byCliente[cliente].total += Number(r[6]||0);
+    if (!byCliente[cliente].meses[mesKey]) byCliente[cliente].meses[mesKey] = {label:mesLabel, total:0, rows:[]};
+    byCliente[cliente].meses[mesKey].total += Number(r[6]||0);
+    byCliente[cliente].meses[mesKey].rows.push(r);
+  });
+  const div = document.getElementById('r-grouped');
+  if (!Object.keys(byCliente).length) { div.innerHTML='<p style="color:var(--text-muted);padding:20px;text-align:center">Sin retenciones registradas</p>'; return; }
+  div.innerHTML = Object.entries(byCliente).sort((a,b)=>a[0].localeCompare(b[0])).map(([cliente, data]) => `
+    <div style="margin-bottom:20px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <div style="background:var(--bg-2);padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
+        <strong style="font-size:14px"><i class="fa-solid fa-building" style="color:var(--accent);margin-right:8px"></i>${cliente}</strong>
+        <span style="color:var(--accent);font-weight:700">${fmtARS(data.total)}</span>
+      </div>
+      ${Object.entries(data.meses).sort((a,b)=>b[0].localeCompare(a[0])).map(([,mes])=>`
+        <div style="padding:0 16px 8px">
+          <div style="display:flex;justify-content:space-between;padding:8px 0 4px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text-muted)">
+            <span><i class="fa-solid fa-calendar-alt" style="margin-right:6px"></i>${mes.label}</span>
+            <span>${fmtARS(mes.total)}</span>
+          </div>
+          ${mes.rows.map(r=>`
+            <div style="display:flex;gap:12px;padding:6px 0;font-size:13px;border-bottom:1px solid var(--border);align-items:center">
+              <span style="color:var(--text-muted);width:80px;flex-shrink:0">${d(r[1])}</span>
+              <span style="width:100px;flex-shrink:0;font-size:12px">${r[2]||'-'}</span>
+              <span style="flex:1">${badge(r[5],''+r[5])}</span>
+              <span style="font-weight:600;width:100px;text-align:right">${fmtARS(r[6])}</span>
+              <span style="color:var(--text-muted);font-size:11px;width:80px">${r[7]||''}</span>
+              ${currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteRetencion('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}
+            </div>`).join('')}
+        </div>`).join('')}
+    </div>`).join('');
 }
 async function deleteRetencion(id) {
   if(!confirm('¿Eliminar?'))return;
