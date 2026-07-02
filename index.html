@@ -786,7 +786,7 @@ function pinCheck() {
 function initApp() {
   ['dash','f','co','pa','r','g','ext'].forEach(p => yearOptions(p + '-year'));
   const cur = String(new Date().getMonth()+1).padStart(2,'0');
-  ['dash-month','f-month','co-month','pa-month','r-month','g-month'].forEach(id => {
+  ['dash-month','f-month','co-month','pa-month','g-month'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = cur;
   });
@@ -1696,9 +1696,7 @@ function renderChequesEmitidos() {
 
 // ─── CC CLIENTES ─────────────────────────────────────────────────
 async function loadAndRenderCCClientes() {
-  if(!_facturas.length) _facturas=await sheetsGet('FACTURAS');
-  if(!_cobros.length) _cobros=await sheetsGet('COBROS');
-  if(!_retenciones.length) _retenciones=await sheetsGet('RETENCIONES');
+  [_facturas,_cobros,_retenciones]=await Promise.all([sheetsGet('FACTURAS'),sheetsGet('COBROS'),sheetsGet('RETENCIONES')]);
   renderCCClientes();
 }
 function renderCCClientes() {
@@ -1744,9 +1742,7 @@ function toggleCC(header) { header.nextElementSibling.classList.toggle('open'); 
 
 // ─── CC PROVEEDORES ───────────────────────────────────────────────
 async function loadAndRenderCCProveedores() {
-  if(!_facturas.length) _facturas=await sheetsGet('FACTURAS');
-  if(!_pagos.length) _pagos=await sheetsGet('PAGOS');
-  if(!_chequesEmi.length) _chequesEmi=await sheetsGet('CHEQUES_EMITIDOS');
+  [_facturas,_pagos,_chequesEmi]=await Promise.all([sheetsGet('FACTURAS'),sheetsGet('PAGOS'),sheetsGet('CHEQUES_EMITIDOS')]);
   renderCCProveedores();
 }
 function renderCCProveedores() {
