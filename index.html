@@ -983,7 +983,10 @@ function showDetalleFactura(r) {
 async function deleteFactura(id) {
   const fac = _facturas.find(r => r[0] === id);
   const folio = fac ? String(fac[2]) : null;
-  const cobrosAsoc = folio ? _cobros.filter(r => { try { return JSON.parse(r[2]).includes(folio); } catch { return String(r[2]).includes(folio); } }) : [];
+  // Siempre recargar cobros del sheet para no perder registros por cache vacío
+  const allCobros = await sheetsGet('COBROS');
+  _cobros = allCobros;
+  const cobrosAsoc = folio ? allCobros.filter(r => { try { return JSON.parse(r[2]).includes(folio); } catch { return String(r[2]).includes(folio); } }) : [];
   const msg = cobrosAsoc.length ? `¿Eliminar esta factura y sus ${cobrosAsoc.length} cobro(s) asociado(s)?` : '¿Eliminar esta factura?';
   if (!confirm(msg)) return;
   await sheetsDelete('FACTURAS', id);
