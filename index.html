@@ -914,7 +914,7 @@ function renderDashboard() {
   // Pendientes table
   const pend = _dashFacturas.filter(r => String(r[5]).toLowerCase()==='venta' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase()));
   const ptbody = document.querySelector('#dash-pendientes tbody');
-  ptbody.innerHTML = pend.length ? pend.map(r => `<tr><td>${r[2]}</td><td>${r[4]}</td><td>${d(r[1])}</td><td>${fmtARS(r[9])}</td><td>${stateBadge(r[10])}</td></tr>`).join('') : '<tr class="empty-row"><td colspan="5">Sin pendientes</td></tr>';
+  ptbody.innerHTML = pend.length ? pend.map(r => { const saldo=Math.max(0,Number(r[9]||0)-(cobradoPorFolio[String(r[2])]||0)); return `<tr><td>${r[2]}</td><td>${r[4]}</td><td>${d(r[1])}</td><td>${fmtARS(saldo)}</td><td>${stateBadge(r[10])}</td></tr>`; }).join('') : '<tr class="empty-row"><td colspan="5">Sin pendientes</td></tr>';
 }
 
 // ─── FACTURAS ────────────────────────────────────────────────────
