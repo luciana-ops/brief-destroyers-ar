@@ -844,9 +844,9 @@ function closeModalOnOverlay(e) {
 }
 
 // ─── DASHBOARD ───────────────────────────────────────────────────
-let _dashFacturas = [];
+let _dashFacturas = [], _dashCobros = [], _dashPagos = [];
 async function loadAndRenderDashboard() {
-  _dashFacturas = await sheetsGet('FACTURAS');
+  [_dashFacturas, _dashCobros, _dashPagos] = await Promise.all([sheetsGet('FACTURAS'), sheetsGet('COBROS'), sheetsGet('PAGOS')]);
   renderDashboard();
 }
 function renderDashboard() {
@@ -867,8 +867,12 @@ function renderDashboard() {
   const ivaDebito = sum(ventasRows, 8);
   const ivaCredito = sum(comprasRows, 8);
   const ivaNeto = ivaDebito - ivaCredito;
-  const porCobrar = _dashFacturas.filter(r => String(r[5]).toLowerCase()==='venta' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase())).reduce((s,r)=>s+Number(r[9]||0),0);
-  const porPagar = _dashFacturas.filter(r => String(r[5]).toLowerCase()==='compra' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase())).reduce((s,r)=>s+Number(r[9]||0),0);
+  const cobradoPorFolio = {};
+  _dashCobros.forEach(r => { try { JSON.parse(r[2]).forEach(f => { cobradoPorFolio[f] = (cobradoPorFolio[f]||0) + Number(r[5]||0); }); } catch {} });
+  const pagadoPorFolio = {};
+  _dashPagos.forEach(r => { try { JSON.parse(r[2]).forEach(f => { pagadoPorFolio[f] = (pagadoPorFolio[f]||0) + Number(r[5]||0); }); } catch {} });
+  const porCobrar = _dashFacturas.filter(r => String(r[5]).toLowerCase()==='venta' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase())).reduce((s,r)=>s+Math.max(0, Number(r[9]||0)-(cobradoPorFolio[String(r[2])]||0)),0);
+  const porPagar = _dashFacturas.filter(r => String(r[5]).toLowerCase()==='compra' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase())).reduce((s,r)=>s+Math.max(0, Number(r[9]||0)-(pagadoPorFolio[String(r[2])]||0)),0);
   const cards = [
     {label:'Ventas Netas', val:ventasNeto, cls:'card-green'},
     {label:'Compras Netas', val:comprasNeto, cls:'card-red'},
