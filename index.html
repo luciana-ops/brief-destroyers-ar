@@ -342,14 +342,24 @@ tr:hover td{background:rgba(255,255,255,.03)}
   <!-- CC CLIENTES -->
   <div id="section-cc-clientes" class="section">
     <div class="page-header"><h2><i class="fa-solid fa-users"></i> Cuenta Corriente Clientes</h2></div>
-    <div class="filters"><input type="text" id="cc-cli-search" placeholder="Buscar por razón o CUIT..." style="width:300px" oninput="renderCCClientes()"></div>
+    <div class="filters">
+      <input type="text" id="cc-cli-search" placeholder="Buscar por razón o CUIT..." style="width:240px" oninput="renderCCClientes()">
+      <label style="font-size:13px;color:var(--muted)">Hasta:</label>
+      <input type="date" id="cc-cli-hasta" onchange="renderCCClientes()" style="width:150px">
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('cc-cli-hasta').value='';renderCCClientes()">Todas las fechas</button>
+    </div>
     <div id="cc-clientes-list"></div>
   </div>
 
   <!-- CC PROVEEDORES -->
   <div id="section-cc-proveedores" class="section">
     <div class="page-header"><h2><i class="fa-solid fa-truck"></i> Cuenta Corriente Proveedores</h2></div>
-    <div class="filters"><input type="text" id="cc-prov-search" placeholder="Buscar por razón o CUIT..." style="width:300px" oninput="renderCCProveedores()"></div>
+    <div class="filters">
+      <input type="text" id="cc-prov-search" placeholder="Buscar por razón o CUIT..." style="width:240px" oninput="renderCCProveedores()">
+      <label style="font-size:13px;color:var(--muted)">Hasta:</label>
+      <input type="date" id="cc-prov-hasta" onchange="renderCCProveedores()" style="width:150px">
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('cc-prov-hasta').value='';renderCCProveedores()">Todas las fechas</button>
+    </div>
     <div id="cc-proveedores-list"></div>
   </div>
 
@@ -786,10 +796,7 @@ function pinCheck() {
 function initApp() {
   ['dash','f','co','pa','r','g','ext'].forEach(p => yearOptions(p + '-year'));
   const cur = String(new Date().getMonth()+1).padStart(2,'0');
-  ['dash-month','f-month','co-month','pa-month','g-month'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = cur;
-  });
+  // No default month — show all months by default
   navigate('dashboard');
 }
 
@@ -1248,7 +1255,7 @@ function renderCobros() {
   tbody.innerHTML = rows.length ? rows.map(r => {
     const folios = cobroFolios(r).join(', ');
     const retTotal = cobroRet(r).reduce((s,x)=>s+Number(x.monto||0),0);
-    const cobroIdx=_cobros.findIndex(x=>x[0]===r[0]); return `<tr><td>${d(r[1])}</td><td>${folios}</td><td>${r[4]}</td><td>${fmtARS(r[5])}</td><td>${retTotal>0?fmtARS(retTotal):'-'}</td><td>${r[6]}</td><td>${r[7]||''}</td><td style="white-space:nowrap"><button class="btn btn-sm" style="background:var(--bg-3);border:1px solid var(--border);margin-right:4px" title="Descargar recibo" onclick="descargarReciboCobro(${cobroIdx})"><i class="fa-solid fa-file-arrow-down"></i></button>${currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteCobro('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`;
+    const cobroIdx=_cobros.findIndex(x=>x[0]===r[0]); return `<tr><td>${d(r[1])}</td><td>${folios}</td><td>${r[4]}</td><td>${fmtARS(r[5])}</td><td>${retTotal>0?fmtARS(retTotal):'-'}</td><td>${r[6]}</td><td>${r[7]||''}</td><td style="white-space:nowrap"><button class="btn btn-sm" style="background:var(--accent);border:none;color:#fff;margin-right:4px" title="Descargar recibo" onclick="descargarReciboCobro(${cobroIdx})"><i class="fa-solid fa-file-arrow-down"></i></button>${currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteCobro('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`;
   }).join('') : '<tr class="empty-row"><td colspan="8">Sin cobros registrados</td></tr>';
 }
 async function deleteCobro(id) {
@@ -1354,11 +1361,10 @@ function generarReciboCliente(data) {
   doc.setDrawColor(...MAG); doc.setLineWidth(1); doc.line(0,36,W,36);
 
   // Fecha + Número
-  const fechaFmt=(data.fecha||'').split('-').reverse().join('/');
   doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(100,100,100);
   doc.text('Fecha:',133,44); doc.text('Número:',133,51);
   doc.setFont('helvetica','bold'); doc.setTextColor(...BLK);
-  doc.text(fechaFmt,W-M,44,{align:'right'});
+  doc.text(String(data.fecha||'').substring(0,10).split('-').reverse().join('/'),W-M,44,{align:'right'});
   doc.text(String(data.nro||1).toString().padStart(3,'0'),W-M,51,{align:'right'});
 
   // Cliente
@@ -1708,13 +1714,14 @@ async function loadAndRenderCCClientes() {
 }
 function renderCCClientes() {
   const q=(document.getElementById('cc-cli-search').value||'').toLowerCase();
+  const hasta=(document.getElementById('cc-cli-hasta').value||'');
   const ventasMap={};
-  _facturas.filter(r=>String(r[5]).toLowerCase()==='venta').forEach(r=>{
+  _facturas.filter(r=>String(r[5]).toLowerCase()==='venta'&&(!hasta||d(r[1])<=hasta)).forEach(r=>{
     const key=r[3]; if(!ventasMap[key]) ventasMap[key]={cuit:r[3],razon:r[4],facturas:[],cobros:[],retenciones:[]};
     ventasMap[key].facturas.push(r);
   });
-  _cobros.forEach(r=>{ if(ventasMap[r[3]]) ventasMap[r[3]].cobros.push(r); });
-  _retenciones.forEach(r=>{ if(ventasMap[r[3]]) ventasMap[r[3]].retenciones.push(r); });
+  _cobros.filter(r=>!hasta||d(r[1])<=hasta).forEach(r=>{ if(ventasMap[r[3]]) ventasMap[r[3]].cobros.push(r); });
+  _retenciones.filter(r=>!hasta||d(r[1])<=hasta).forEach(r=>{ if(ventasMap[r[3]]) ventasMap[r[3]].retenciones.push(r); });
   const list=document.getElementById('cc-clientes-list');
   const entries=Object.values(ventasMap).filter(c=>!q||c.razon.toLowerCase().includes(q)||c.cuit.includes(q));
   if(!entries.length){list.innerHTML='<p style="color:var(--muted);padding:20px">Sin resultados</p>';return;}
@@ -1754,13 +1761,14 @@ async function loadAndRenderCCProveedores() {
 }
 function renderCCProveedores() {
   const q=(document.getElementById('cc-prov-search').value||'').toLowerCase();
+  const hasta=(document.getElementById('cc-prov-hasta').value||'');
   const provMap={};
-  _facturas.filter(r=>String(r[5]).toLowerCase()==='compra').forEach(r=>{
+  _facturas.filter(r=>String(r[5]).toLowerCase()==='compra'&&(!hasta||d(r[1])<=hasta)).forEach(r=>{
     const key=r[3];if(!provMap[key])provMap[key]={cuit:r[3],razon:r[4],facturas:[],pagos:[],cheques:[]};
     provMap[key].facturas.push(r);
   });
-  _pagos.forEach(r=>{if(provMap[r[3]])provMap[r[3]].pagos.push(r);});
-  _chequesEmi.forEach(r=>{if(provMap[r[4]])provMap[r[4]].cheques.push(r);});
+  _pagos.filter(r=>!hasta||d(r[1])<=hasta).forEach(r=>{if(provMap[r[3]])provMap[r[3]].pagos.push(r);});
+  _chequesEmi.filter(r=>!hasta||d(r[1])<=hasta).forEach(r=>{if(provMap[r[4]])provMap[r[4]].cheques.push(r);});
   const list=document.getElementById('cc-proveedores-list');
   const entries=Object.values(provMap).filter(p=>!q||p.razon.toLowerCase().includes(q)||p.cuit.includes(q));
   if(!entries.length){list.innerHTML='<p style="color:var(--muted);padding:20px">Sin resultados</p>';return;}
