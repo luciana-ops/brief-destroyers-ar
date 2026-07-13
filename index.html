@@ -1136,7 +1136,7 @@ async function saveFactura() {
   const notas = isNC && ncRef ? `NC - anula factura folio ${ncRef}` : document.getElementById('fac-notas').value;
   const row = [id, fecha, folio, cuit, razon, tipo, tipoDoc,
     isNC ? -Math.abs(neto) : neto, isNC ? -Math.abs(iva) : iva, isNC ? -Math.abs(total) : total,
-    'pendiente', notas, oc, concepto, moneda, tc, impExt];
+    isNC ? 'anulada' : 'pendiente', notas, oc, concepto, moneda, tc, impExt];
   try {
     await sheetsAppend('FACTURAS', [row]);
     _facturas.push(row);
