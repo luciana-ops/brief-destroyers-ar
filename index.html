@@ -977,7 +977,7 @@ function renderFacturas() {
       <td>${docBadge(String(r[6]).toUpperCase())}</td>
       <td>${badge(String(r[5]).toLowerCase()==='venta'?'Venta':'Compra', String(r[5]).toLowerCase())}</td>
       <td>${r[4]}<br><small style="color:var(--muted)">${r[3]}</small></td>
-      <td style="font-size:12px;color:var(--muted)">${r[13]||''}</td>
+      <td style="font-size:12px;color:var(--muted)">${String(r[6]).toUpperCase()==='NC'?`<span style="color:var(--red)">${r[11]||''}</span>`:(r[13]||'')}</td>
       <td style="font-size:12px;color:var(--muted)">${r[12]||''}</td>
       <td>${fmtARS(r[7])}</td>
       <td>${fmtARS(r[8])}</td>
