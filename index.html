@@ -261,7 +261,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="totals-bar" id="f-totals"></div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Fecha</th><th>Folio</th><th>Doc</th><th>Tipo</th><th>Cliente/Proveedor</th><th>Neto</th><th>IVA</th><th>Total</th><th>Estado</th><th></th></tr></thead>
+        <thead><tr><th>Fecha</th><th>Folio</th><th>Doc</th><th>Tipo</th><th>Cliente/Proveedor</th><th>Concepto</th><th>OC</th><th>Neto</th><th>IVA</th><th>Total</th><th>Estado</th><th></th></tr></thead>
         <tbody id="f-tbody"></tbody>
       </table>
     </div>
@@ -465,6 +465,10 @@ tr:hover td{background:rgba(255,255,255,.03)}
           <div class="form-group"><label id="fac-iva-label">IVA (21%)</label><input id="fac-iva" type="number" step="0.01"></div>
         </div>
         <div class="form-group"><label>Total</label><input id="fac-total" type="number" step="0.01"></div>
+        <div class="form-row">
+          <div class="form-group"><label>Orden de compra (OC)</label><input id="fac-oc" type="text" placeholder="Nro de OC si figura"></div>
+          <div class="form-group"><label>Concepto</label><input id="fac-concepto" type="text" placeholder="Ej: Fee junio, Producción libretos"></div>
+        </div>
         <div id="fac-nc-ref-group" class="form-group" style="display:none"><label>Folio que anula (NC)</label><input id="fac-nc-ref" type="text"></div>
         <div class="form-group"><label>Notas</label><textarea id="fac-notas"></textarea></div>
         <div id="fac-dup-warning" style="display:none;color:var(--red);font-size:13px;margin-bottom:10px"><i class="fa-solid fa-triangle-exclamation"></i> Este folio ya existe — verificá si es un duplicado.</div>
@@ -954,7 +958,7 @@ function renderFacturas() {
     <div class="t-item"><div class="t-label">Total</div><div class="t-val">${fmtARS(sumTotal)}</div></div>
     <div class="t-item"><div class="t-label">Total USD</div><div class="t-val">${fmtUSD(sumTotal)}</div></div>`;
   const tbody = document.getElementById('f-tbody');
-  if (!rows.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="10">Sin facturas para los filtros seleccionados</td></tr>'; return; }
+  if (!rows.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="12">Sin facturas para los filtros seleccionados</td></tr>'; return; }
   tbody.innerHTML = rows.map(r => `
     <tr>
       <td>${d(r[1])}</td>
@@ -962,6 +966,8 @@ function renderFacturas() {
       <td>${docBadge(String(r[6]).toUpperCase())}</td>
       <td>${badge(String(r[5]).toLowerCase()==='venta'?'Venta':'Compra', String(r[5]).toLowerCase())}</td>
       <td>${r[4]}<br><small style="color:var(--muted)">${r[3]}</small></td>
+      <td style="font-size:12px;color:var(--muted)">${r[13]||''}</td>
+      <td style="font-size:12px;color:var(--muted)">${r[12]||''}</td>
       <td>${fmtARS(r[7])}</td>
       <td>${fmtARS(r[8])}</td>
       <td><strong>${fmtARS(r[9])}</strong></td>
@@ -1024,6 +1030,7 @@ function openFacturaModal() {
   document.getElementById('fac-ai-info').style.display='none';
   document.getElementById('fac-dup-warning').style.display='none';
   document.getElementById('fac-file').value='';
+  ['fac-folio','fac-fecha','fac-cuit','fac-razon','fac-neto','fac-iva','fac-total','fac-nc-ref','fac-oc','fac-concepto','fac-notas'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   openModal('modal-factura');
 }
 async function handleFacturaDrop(e) {
@@ -1037,7 +1044,7 @@ async function processFacturaFile(file) {
   try {
     const base64 = await fileToBase64(file);
     const mediaType = file.type === 'application/pdf' ? 'application/pdf' : file.type;
-    const prompt = `Extraé del comprobante en JSON estricto (sin markdown): numero_folio, fecha (YYYY-MM-DD), cuit_emisor (formato XX-XXXXXXXX-X), razon_emisor, cuit_receptor (formato XX-XXXXXXXX-X), razon_receptor, tipo_comprobante (A/B/C/NC), monto_neto (número sin formato — para Factura C sin IVA, monto_neto es igual al total), iva (número — 0 para Factura C de monotributista), total (número), es_nota_credito (boolean), folio_referencia (string o null si no aplica). Solo JSON.`;
+    const prompt = `Extraé del comprobante en JSON estricto (sin markdown): numero_folio, fecha (YYYY-MM-DD), cuit_emisor (formato XX-XXXXXXXX-X), razon_emisor, cuit_receptor (formato XX-XXXXXXXX-X), razon_receptor, tipo_comprobante (A/B/C/NC), monto_neto (número sin formato — para Factura C sin IVA, monto_neto es igual al total), iva (número — 0 para Factura C de monotributista), total (número), es_nota_credito (boolean), folio_referencia (string o null si no aplica), orden_compra (número o código de orden de compra/OC si figura en el comprobante, sino null), concepto (descripción breve del servicio o producto facturado, máximo 6 palabras, ej: "Fee junio 2026", "Producción libretos", "Servicios creativos mayo"). Solo JSON.`;
     const raw = await callClaude(base64, mediaType, prompt);
     const json = JSON.parse(raw.replace(/```json\n?|\n?```/g,'').trim());
     fillFacturaForm(json);
@@ -1063,6 +1070,8 @@ function fillFacturaForm(j) {
   document.getElementById('fac-total').value = j.total||'';
   document.getElementById('fac-nc-ref-group').style.display = j.es_nota_credito ? 'block' : 'none';
   document.getElementById('fac-nc-ref').value = j.folio_referencia||'';
+  document.getElementById('fac-oc').value = j.orden_compra||'';
+  document.getElementById('fac-concepto').value = j.concepto||'';
   checkDuplicateFactura();
   document.getElementById('fac-form').style.display='block';
   document.getElementById('fac-save-btn').style.display='inline-flex';
@@ -1086,11 +1095,13 @@ async function saveFactura() {
   const iva = Number(document.getElementById('fac-iva').value)||0;
   const total = Number(document.getElementById('fac-total').value)||0;
   const ncRef = document.getElementById('fac-nc-ref').value.trim();
+  const oc = document.getElementById('fac-oc').value.trim();
+  const concepto = document.getElementById('fac-concepto').value.trim();
   const isNC = tipoDoc === 'NC';
   const notas = isNC && ncRef ? `NC - anula factura folio ${ncRef}` : document.getElementById('fac-notas').value;
   const row = [id, fecha, folio, cuit, razon, tipo, tipoDoc,
     isNC ? -Math.abs(neto) : neto, isNC ? -Math.abs(iva) : iva, isNC ? -Math.abs(total) : total,
-    'pendiente', notas];
+    'pendiente', notas, oc, concepto];
   try {
     await sheetsAppend('FACTURAS', [row]);
     _facturas.push(row);
