@@ -252,7 +252,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
       <select id="f-year" onchange="renderFacturas()"></select>
       <select id="f-month" onchange="renderFacturas()"><option value="">Todos los meses</option><option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option><option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option><option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option></select>
       <select id="f-tipo" onchange="renderFacturas()"><option value="">Venta + Compra</option><option value="venta">Ventas</option><option value="compra">Compras</option></select>
-      <select id="f-tipodoc" onchange="renderFacturas()"><option value="">Todos los doc.</option><option value="A">Factura A</option><option value="B">Factura B</option><option value="C">Factura C</option><option value="NC">Nota de Crédito</option></select>
+      <select id="f-tipodoc" onchange="renderFacturas()"><option value="">Todos los doc.</option><option value="A">Factura A</option><option value="B">Factura B</option><option value="C">Factura C</option><option value="FCEA">FCE A</option><option value="FCEB">FCE B</option><option value="FCEC">FCE C</option><option value="NC">Nota de Crédito</option></select>
       <select id="f-estado" onchange="renderFacturas()"><option value="">Todos los estados</option><option value="pendiente">Pendiente</option><option value="cobrada">Cobrada</option><option value="pagada">Pagada</option><option value="parcial">Parcial</option><option value="anulada">Anulada</option></select>
       <input id="f-cliente" type="text" placeholder="Filtrar por cliente..." oninput="renderFacturas()" style="padding:7px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;width:200px">
       <button class="btn btn-secondary btn-sm" onclick="exportFacturasExcel()"><i class="fa-solid fa-file-excel"></i> Excel</button>
@@ -450,7 +450,11 @@ tr:hover td{background:rgba(255,255,255,.03)}
         </div>
         <div class="form-row">
           <div class="form-group"><label>Tipo doc.</label>
-            <select id="fac-tipodoc" onchange="calcIVA()"><option value="A">Factura A</option><option value="B">Factura B</option><option value="C">Factura C</option><option value="NC">Nota de Crédito</option></select>
+            <select id="fac-tipodoc" onchange="calcIVA()">
+              <option value="A">Factura A</option><option value="B">Factura B</option><option value="C">Factura C</option>
+              <option value="FCEA">FCE A — Crédito Electrónica A</option><option value="FCEB">FCE B — Crédito Electrónica B</option><option value="FCEC">FCE C — Crédito Electrónica C</option>
+              <option value="NC">Nota de Crédito</option>
+            </select>
           </div>
           <div class="form-group"><label>Tipo</label>
             <select id="fac-tipo"><option value="venta">Venta</option><option value="compra">Compra</option></select>
@@ -713,7 +717,11 @@ function toast(msg, type='success') {
 }
 function badge(text, cls) { return `<span class="badge badge-${cls}">${text}</span>`; }
 function stateBadge(e) { return badge(e, e); }
-function docBadge(d) { return badge(d === 'NC' ? 'NC' : `Fac. ${d}`, d); }
+function docBadge(d) {
+  if(d==='NC') return badge('NC','NC');
+  if(d.startsWith('FCE')) return badge('FCE '+d.slice(3),d);
+  return badge('Fac. '+d,d);
+}
 function yearOptions(selId) {
   const sel = document.getElementById(selId);
   const cur = new Date().getFullYear();
@@ -1032,7 +1040,7 @@ function toggleMonedaExt() {
 function calcIVA() {
   const neto = Number(document.getElementById('fac-neto').value)||0;
   const tipoDoc = document.getElementById('fac-tipodoc').value;
-  const sinIVA = tipoDoc === 'C' || tipoDoc === 'NC';
+  const sinIVA = tipoDoc === 'C' || tipoDoc === 'NC' || tipoDoc === 'FCEC';
   document.getElementById('fac-iva-label').textContent = sinIVA ? 'IVA (0% — sin IVA)' : 'IVA (21%)';
   document.getElementById('fac-iva').value = sinIVA ? '0' : (neto * IVA_RATE).toFixed(2);
   document.getElementById('fac-iva').readOnly = sinIVA;
@@ -1064,7 +1072,7 @@ async function processFacturaFile(file) {
   try {
     const base64 = await fileToBase64(file);
     const mediaType = file.type === 'application/pdf' ? 'application/pdf' : file.type;
-    const prompt = `Extraé del comprobante en JSON estricto (sin markdown): numero_folio, fecha (YYYY-MM-DD), cuit_emisor (formato XX-XXXXXXXX-X), razon_emisor, cuit_receptor (formato XX-XXXXXXXX-X), razon_receptor, tipo_comprobante (A/B/C/NC), moneda (ARS/USD/EUR — moneda en que está expresada la factura), tipo_cambio (número — tipo de cambio AFIP usado si es moneda extranjera, sino null), importe_moneda_original (número — importe NETO en la moneda extranjera original si aplica, sino null), monto_neto (número en PESOS ARGENTINOS — si la factura es en moneda extranjera usar el importe convertido a pesos que figura al pie del comprobante; para Factura C monto_neto es igual al total), iva (número en PESOS — 0 para Factura C o moneda extranjera sin IVA separado), total (número en PESOS ARGENTINOS — siempre el total en pesos del pie del comprobante), es_nota_credito (boolean), folio_referencia (string o null), orden_compra (string o null), concepto (descripción breve del servicio, máximo 6 palabras, ej: "Fee junio 2026", "Producción libretos"). Solo JSON.`;
+    const prompt = `Extraé del comprobante en JSON estricto (sin markdown): numero_folio, fecha (YYYY-MM-DD), cuit_emisor (formato XX-XXXXXXXX-X), razon_emisor, cuit_receptor (formato XX-XXXXXXXX-X), razon_receptor, tipo_comprobante (A/B/C/NC/FCEA/FCEB/FCEC — usar FCEA/FCEB/FCEC cuando el comprobante dice "Factura de Crédito Electrónica MiPyME"), moneda (ARS/USD/EUR — moneda en que está expresada la factura), tipo_cambio (número — tipo de cambio AFIP usado si es moneda extranjera, sino null), importe_moneda_original (número — importe NETO en la moneda extranjera original si aplica, sino null), monto_neto (número en PESOS ARGENTINOS — si la factura es en moneda extranjera usar el importe convertido a pesos que figura al pie del comprobante; para Factura C monto_neto es igual al total), iva (número en PESOS — 0 para Factura C o moneda extranjera sin IVA separado), total (número en PESOS ARGENTINOS — siempre el total en pesos del pie del comprobante), es_nota_credito (boolean), folio_referencia (string o null), orden_compra (string o null), concepto (descripción breve del servicio, máximo 6 palabras, ej: "Fee junio 2026", "Producción libretos"). Solo JSON.`;
     const raw = await callClaude(base64, mediaType, prompt);
     const json = JSON.parse(raw.replace(/```json\n?|\n?```/g,'').trim());
     fillFacturaForm(json);
@@ -1081,7 +1089,7 @@ function fillFacturaForm(j) {
   const razon = esVenta ? j.razon_receptor : j.razon_emisor;
   document.getElementById('fac-folio').value = j.numero_folio||'';
   document.getElementById('fac-fecha').value = j.fecha||today();
-  document.getElementById('fac-tipodoc').value = j.es_nota_credito ? 'NC' : (j.tipo_comprobante||'A');
+  document.getElementById('fac-tipodoc').value = j.es_nota_credito ? 'NC' : (['A','B','C','FCEA','FCEB','FCEC'].includes(j.tipo_comprobante) ? j.tipo_comprobante : 'A');
   document.getElementById('fac-tipo').value = esVenta ? 'venta' : 'compra';
   document.getElementById('fac-cuit').value = cuit||'';
   document.getElementById('fac-razon').value = razon||'';
@@ -1135,7 +1143,14 @@ async function saveFactura() {
     if (isNC && ncRef) {
       const normFolio = f => String(f||'').trim().split('-').map(p=>String(parseInt(p,10)||0)).join('-');
       const ncRefNorm = normFolio(ncRef);
-      const ref = _facturas.find(r => normFolio(r[2]) === ncRefNorm && String(r[6]).toUpperCase() !== 'NC');
+      const ncTipoDoc = String(tipoDoc).toUpperCase();
+      const isFCE_NC = ncTipoDoc.startsWith('FCE');
+      const ref = _facturas.find(r => {
+        const td = String(r[6]).toUpperCase();
+        if (td === 'NC') return false;
+        if (normFolio(r[2]) !== ncRefNorm) return false;
+        return isFCE_NC ? td.startsWith('FCE') : !td.startsWith('FCE');
+      });
       if (ref) { await sheetsUpdateById('FACTURAS', ref[0], 'K', 'anulada'); ref[10]='anulada'; toast('Factura '+ref[2]+' marcada como anulada'); }
       else toast('NC guardada — factura referenciada no encontrada en el sistema','warning');
     }
