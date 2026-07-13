@@ -1133,8 +1133,11 @@ async function saveFactura() {
     await sheetsAppend('FACTURAS', [row]);
     _facturas.push(row);
     if (isNC && ncRef) {
-      const ref = _facturas.find(r => String(r[2]).trim() === ncRef && String(r[6]).toUpperCase() !== 'NC');
-      if (ref) await sheetsUpdateById('FACTURAS', ref[0], 'K', 'anulada');
+      const normFolio = f => String(f||'').trim().split('-').map(p=>String(parseInt(p,10)||0)).join('-');
+      const ncRefNorm = normFolio(ncRef);
+      const ref = _facturas.find(r => normFolio(r[2]) === ncRefNorm && String(r[6]).toUpperCase() !== 'NC');
+      if (ref) { await sheetsUpdateById('FACTURAS', ref[0], 'K', 'anulada'); ref[10]='anulada'; toast('Factura '+ref[2]+' marcada como anulada'); }
+      else toast('NC guardada — factura referenciada no encontrada en el sistema','warning');
     }
     renderFacturas();
     closeModal('modal-factura');
