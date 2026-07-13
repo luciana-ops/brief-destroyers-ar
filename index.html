@@ -464,7 +464,14 @@ tr:hover td{background:rgba(255,255,255,.03)}
           <div class="form-group"><label>Neto</label><input id="fac-neto" type="number" step="0.01" oninput="calcIVA()"></div>
           <div class="form-group"><label id="fac-iva-label">IVA (21%)</label><input id="fac-iva" type="number" step="0.01"></div>
         </div>
-        <div class="form-group"><label>Total</label><input id="fac-total" type="number" step="0.01"></div>
+        <div class="form-group"><label>Total (en pesos)</label><input id="fac-total" type="number" step="0.01"></div>
+        <div class="form-row" id="fac-moneda-group">
+          <div class="form-group"><label>Moneda</label>
+            <select id="fac-moneda" onchange="toggleMonedaExt()"><option value="ARS">ARS — Pesos</option><option value="USD">USD — Dólares</option><option value="EUR">EUR — Euros</option></select>
+          </div>
+          <div class="form-group" id="fac-tc-group" style="display:none"><label>Tipo de cambio AFIP</label><input id="fac-tc" type="number" step="0.01" placeholder="Ej: 1200.00"></div>
+          <div class="form-group" id="fac-imp-ext-group" style="display:none"><label>Importe en moneda extranjera</label><input id="fac-imp-ext" type="number" step="0.01" placeholder="Ej: 3500.00"></div>
+        </div>
         <div class="form-row">
           <div class="form-group"><label>Orden de compra (OC)</label><input id="fac-oc" type="text" placeholder="Nro de OC si figura"></div>
           <div class="form-group"><label>Concepto</label><input id="fac-concepto" type="text" placeholder="Ej: Fee junio, Producción libretos"></div>
@@ -970,7 +977,7 @@ function renderFacturas() {
       <td style="font-size:12px;color:var(--muted)">${r[12]||''}</td>
       <td>${fmtARS(r[7])}</td>
       <td>${fmtARS(r[8])}</td>
-      <td><strong>${fmtARS(r[9])}</strong></td>
+      <td><strong>${fmtARS(r[9])}</strong>${r[14]&&r[14]!=='ARS'?`<br><small style="color:var(--accent);font-size:11px">${r[14]} ${Number(r[16]||0).toLocaleString('es-AR',{minimumFractionDigits:2})} · TC ${r[15]}</small>`:''}</td>
       <td>${stateBadge(String(r[10]).toLowerCase())}</td>
       <td>
         <button class="btn btn-secondary btn-sm" onclick='showDetalleFactura(${JSON.stringify(r)})'><i class="fa-solid fa-eye"></i></button>
@@ -1013,6 +1020,11 @@ async function deleteFactura(id) {
   renderFacturas();
   toast('Factura eliminada' + (cobrosAsoc.length ? ` (+ ${cobrosAsoc.length} cobro(s))` : ''));
 }
+function toggleMonedaExt() {
+  const ext = document.getElementById('fac-moneda').value !== 'ARS';
+  document.getElementById('fac-tc-group').style.display = ext ? 'block' : 'none';
+  document.getElementById('fac-imp-ext-group').style.display = ext ? 'block' : 'none';
+}
 function calcIVA() {
   const neto = Number(document.getElementById('fac-neto').value)||0;
   const tipoDoc = document.getElementById('fac-tipodoc').value;
@@ -1031,7 +1043,9 @@ function openFacturaModal() {
   document.getElementById('fac-dup-warning').style.display='none';
   document.getElementById('fac-file').value='';
   document.getElementById('fac-dropzone').style.display='';
-  ['fac-folio','fac-fecha','fac-cuit','fac-razon','fac-neto','fac-iva','fac-total','fac-nc-ref','fac-oc','fac-concepto','fac-notas'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['fac-folio','fac-fecha','fac-cuit','fac-razon','fac-neto','fac-iva','fac-total','fac-nc-ref','fac-oc','fac-concepto','fac-notas','fac-tc','fac-imp-ext'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('fac-moneda').value='ARS';
+  toggleMonedaExt();
   openModal('modal-factura');
 }
 async function handleFacturaDrop(e) {
@@ -1045,7 +1059,7 @@ async function processFacturaFile(file) {
   try {
     const base64 = await fileToBase64(file);
     const mediaType = file.type === 'application/pdf' ? 'application/pdf' : file.type;
-    const prompt = `Extraé del comprobante en JSON estricto (sin markdown): numero_folio, fecha (YYYY-MM-DD), cuit_emisor (formato XX-XXXXXXXX-X), razon_emisor, cuit_receptor (formato XX-XXXXXXXX-X), razon_receptor, tipo_comprobante (A/B/C/NC), monto_neto (número sin formato — para Factura C sin IVA, monto_neto es igual al total), iva (número — 0 para Factura C de monotributista), total (número), es_nota_credito (boolean), folio_referencia (string o null si no aplica), orden_compra (número o código de orden de compra/OC si figura en el comprobante, sino null), concepto (descripción breve del servicio o producto facturado, máximo 6 palabras, ej: "Fee junio 2026", "Producción libretos", "Servicios creativos mayo"). Solo JSON.`;
+    const prompt = `Extraé del comprobante en JSON estricto (sin markdown): numero_folio, fecha (YYYY-MM-DD), cuit_emisor (formato XX-XXXXXXXX-X), razon_emisor, cuit_receptor (formato XX-XXXXXXXX-X), razon_receptor, tipo_comprobante (A/B/C/NC), moneda (ARS/USD/EUR — moneda en que está expresada la factura), tipo_cambio (número — tipo de cambio AFIP usado si es moneda extranjera, sino null), importe_moneda_original (número — importe NETO en la moneda extranjera original si aplica, sino null), monto_neto (número en PESOS ARGENTINOS — si la factura es en moneda extranjera usar el importe convertido a pesos que figura al pie del comprobante; para Factura C monto_neto es igual al total), iva (número en PESOS — 0 para Factura C o moneda extranjera sin IVA separado), total (número en PESOS ARGENTINOS — siempre el total en pesos del pie del comprobante), es_nota_credito (boolean), folio_referencia (string o null), orden_compra (string o null), concepto (descripción breve del servicio, máximo 6 palabras, ej: "Fee junio 2026", "Producción libretos"). Solo JSON.`;
     const raw = await callClaude(base64, mediaType, prompt);
     const json = JSON.parse(raw.replace(/```json\n?|\n?```/g,'').trim());
     fillFacturaForm(json);
@@ -1073,6 +1087,10 @@ function fillFacturaForm(j) {
   document.getElementById('fac-nc-ref').value = j.folio_referencia||'';
   document.getElementById('fac-oc').value = j.orden_compra||'';
   document.getElementById('fac-concepto').value = j.concepto||'';
+  document.getElementById('fac-moneda').value = j.moneda||'ARS';
+  document.getElementById('fac-tc').value = j.tipo_cambio||'';
+  document.getElementById('fac-imp-ext').value = j.importe_moneda_original||'';
+  toggleMonedaExt();
   checkDuplicateFactura();
   document.getElementById('fac-form').style.display='block';
   document.getElementById('fac-save-btn').style.display='inline-flex';
@@ -1098,11 +1116,14 @@ async function saveFactura() {
   const ncRef = document.getElementById('fac-nc-ref').value.trim();
   const oc = document.getElementById('fac-oc').value.trim();
   const concepto = document.getElementById('fac-concepto').value.trim();
+  const moneda = document.getElementById('fac-moneda').value||'ARS';
+  const tc = Number(document.getElementById('fac-tc').value)||'';
+  const impExt = Number(document.getElementById('fac-imp-ext').value)||'';
   const isNC = tipoDoc === 'NC';
   const notas = isNC && ncRef ? `NC - anula factura folio ${ncRef}` : document.getElementById('fac-notas').value;
   const row = [id, fecha, folio, cuit, razon, tipo, tipoDoc,
     isNC ? -Math.abs(neto) : neto, isNC ? -Math.abs(iva) : iva, isNC ? -Math.abs(total) : total,
-    'pendiente', notas, oc, concepto];
+    'pendiente', notas, oc, concepto, moneda, tc, impExt];
   try {
     await sheetsAppend('FACTURAS', [row]);
     _facturas.push(row);
@@ -1187,7 +1208,7 @@ function filtrarFacturasPorCliente() {
   if (!cuit) { group.style.display='none'; updateCoSaldo(); return; }
   const opts = _facturas.filter(r => String(r[5]).toLowerCase()==='venta' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase()) && r[3]===cuit);
   const list = document.getElementById('co-facturas-list');
-  list.innerHTML = opts.length ? opts.map(r=>`<label style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"><input type="checkbox" class="co-fac-cb" value="${r[2]}" data-id="${r[0]}" data-cuit="${r[3]}" data-razon="${r[4]}" data-total="${r[9]}" data-moneda="${r[6]||'ARS'}" data-concepto="${r[5]||''}" onchange="updateCoSaldo()"> <span style="flex:1">${r[2]} · <span style="color:var(--text-muted);font-size:12px">${d(r[1])}</span></span><strong>${fmtARS(r[9])}</strong></label>`).join('') : '<p style="color:var(--text-muted);font-size:13px;margin:0">No hay facturas pendientes para este cliente</p>';
+  list.innerHTML = opts.length ? opts.map(r=>`<label style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"><input type="checkbox" class="co-fac-cb" value="${r[2]}" data-id="${r[0]}" data-cuit="${r[3]}" data-razon="${r[4]}" data-total="${r[9]}" data-moneda="${r[14]||'ARS'}" data-concepto="${r[5]||''}" onchange="updateCoSaldo()"> <span style="flex:1">${r[2]} · <span style="color:var(--text-muted);font-size:12px">${d(r[1])}</span></span><strong>${fmtARS(r[9])}</strong></label>`).join('') : '<p style="color:var(--text-muted);font-size:13px;margin:0">No hay facturas pendientes para este cliente</p>';
   group.style.display = 'block';
   updateCoSaldo();
 }
