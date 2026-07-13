@@ -1030,6 +1030,7 @@ function openFacturaModal() {
   document.getElementById('fac-ai-info').style.display='none';
   document.getElementById('fac-dup-warning').style.display='none';
   document.getElementById('fac-file').value='';
+  document.getElementById('fac-dropzone').style.display='';
   ['fac-folio','fac-fecha','fac-cuit','fac-razon','fac-neto','fac-iva','fac-total','fac-nc-ref','fac-oc','fac-concepto','fac-notas'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   openModal('modal-factura');
 }
