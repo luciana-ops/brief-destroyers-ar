@@ -1933,7 +1933,7 @@ function renderMaestro(tipo) {
     <td style="font-size:12px">${r[6]||'-'}</td>
     ${esProv?`<td style="font-size:12px">${r[8]||'-'}</td><td style="font-size:12px">${r[9]?`<span style="font-family:monospace">${r[9]}</span>`:''}${r[10]?`<br><small style="color:var(--text-muted)">${r[10]}</small>`:''}</td>`:''}
     <td style="font-size:12px;color:var(--text-muted)">${r[7]||''}</td>
-    <td>${currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteMaestro('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}</td>
+    <td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="editMaestro('${r[0]}')"><i class="fa-solid fa-pen"></i></button>${currentUser.role==='admin'?` <button class="btn btn-danger btn-sm" onclick="deleteMaestro('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}</td>
   </tr>`).join('') : `<tr class="empty-row"><td colspan="${esProv?9:7}">Sin ${tipo}s registrados</td></tr>`;
 }
 function populateMaestroSelect() {
@@ -1960,7 +1960,9 @@ function toggleMaestroTipo() {
   const esProv = document.getElementById('m-tipo').value === 'proveedor';
   document.getElementById('m-banco-fields').style.display = esProv ? 'block' : 'none';
 }
+let _maestroEditId = null;
 function openMaestroModal(tipo='cliente') {
+  _maestroEditId = null;
   document.getElementById('maestro-modal-title').textContent = 'Nuevo Contacto';
   ['m-razon','m-cuit','m-email','m-tel','m-notas','m-banco','m-cbu','m-alias','m-titular'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('m-tipo').value = tipo;
@@ -1970,18 +1972,48 @@ function openMaestroModal(tipo='cliente') {
   toggleMaestroTipo();
   openModal('modal-maestro');
 }
+function editMaestro(id) {
+  const r = _maestro.find(x=>x[0]===id); if (!r) return;
+  _maestroEditId = id;
+  document.getElementById('maestro-modal-title').textContent = 'Editar Contacto';
+  document.getElementById('m-razon').value = r[1]||'';
+  document.getElementById('m-cuit').value = r[2]||'';
+  document.getElementById('m-tipo').value = r[3]||'cliente';
+  document.getElementById('m-condiva').value = r[4]||'responsable_inscripto';
+  document.getElementById('m-email').value = r[5]||'';
+  document.getElementById('m-tel').value = r[6]||'';
+  document.getElementById('m-notas').value = r[7]||'';
+  document.getElementById('m-banco').value = r[8]||'';
+  document.getElementById('m-cbu').value = r[9]||'';
+  document.getElementById('m-alias').value = r[10]||'';
+  document.getElementById('m-tipocuenta').value = r[11]||'caja_ahorro';
+  document.getElementById('m-titular').value = r[12]||'';
+  document.getElementById('m-save-btn').disabled = false;
+  toggleMaestroTipo();
+  openModal('modal-maestro');
+}
 async function saveMaestro() {
   const btn = document.getElementById('m-save-btn'); btn.disabled=true;
   const razon = document.getElementById('m-razon').value.trim();
   const cuit = document.getElementById('m-cuit').value.trim();
   if (!razon||!cuit) { toast('Razón social y CUIT son obligatorios','error'); btn.disabled=false; return; }
-  const id = 'M'+Date.now();
   const esProv = document.getElementById('m-tipo').value === 'proveedor';
-  const row = [id, razon, cuit, document.getElementById('m-tipo').value, document.getElementById('m-condiva').value, document.getElementById('m-email').value.trim(), document.getElementById('m-tel').value.trim(), document.getElementById('m-notas').value.trim(), esProv?document.getElementById('m-banco').value.trim():'', esProv?document.getElementById('m-cbu').value.trim():'', esProv?document.getElementById('m-alias').value.trim():'', esProv?document.getElementById('m-tipocuenta').value:'', esProv?document.getElementById('m-titular').value.trim():''];
+  const fields = [razon, cuit, document.getElementById('m-tipo').value, document.getElementById('m-condiva').value, document.getElementById('m-email').value.trim(), document.getElementById('m-tel').value.trim(), document.getElementById('m-notas').value.trim(), esProv?document.getElementById('m-banco').value.trim():'', esProv?document.getElementById('m-cbu').value.trim():'', esProv?document.getElementById('m-alias').value.trim():'', esProv?document.getElementById('m-tipocuenta').value:'', esProv?document.getElementById('m-titular').value.trim():''];
   try {
-    await sheetsAppend('MAESTRO',[row]); _maestro.push(row);
+    if (_maestroEditId) {
+      const cols = ['B','C','D','E','F','G','H','I','J','K','L','M'];
+      await Promise.all(fields.map((v,i)=>sheetsUpdateById('MAESTRO',_maestroEditId,cols[i],v)));
+      const idx = _maestro.findIndex(r=>r[0]===_maestroEditId);
+      if (idx>=0) _maestro[idx] = [_maestroEditId, ...fields];
+      toast('Contacto actualizado');
+    } else {
+      const id = 'M'+Date.now();
+      const row = [id, ...fields];
+      await sheetsAppend('MAESTRO',[row]); _maestro.push(row);
+      toast('Contacto guardado');
+    }
     renderMaestro('cliente'); renderMaestro('proveedor'); populateMaestroSelect();
-    closeModal('modal-maestro'); toast('Contacto guardado');
+    closeModal('modal-maestro');
   } catch(e) { toast('Error: '+e.message,'error'); btn.disabled=false; }
 }
 async function deleteMaestro(id) {
