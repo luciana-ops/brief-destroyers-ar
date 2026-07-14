@@ -460,6 +460,12 @@ tr:hover td{background:rgba(255,255,255,.03)}
             <select id="fac-tipo"><option value="venta">Venta</option><option value="compra">Compra</option></select>
           </div>
         </div>
+        <div class="form-group" id="fac-maestro-group">
+          <label>Buscar contacto</label>
+          <select id="fac-maestro-sel" onchange="fillFromMaestro(this.value)" style="width:100%">
+            <option value="">— Seleccioná o completá manualmente abajo —</option>
+          </select>
+        </div>
         <div class="form-row">
           <div class="form-group"><label>CUIT</label><input id="fac-cuit" type="text" placeholder="XX-XXXXXXXX-X"></div>
           <div class="form-group"><label>Razón Social</label><input id="fac-razon" type="text"></div>
@@ -814,9 +820,8 @@ function pinCheck() {
 // ─── APP INIT ────────────────────────────────────────────────────
 function initApp() {
   ['dash','f','co','pa','r','g','ext'].forEach(p => yearOptions(p + '-year'));
-  const cur = String(new Date().getMonth()+1).padStart(2,'0');
-  // No default month — show all months by default
   navigate('dashboard');
+  sheetsGet('MAESTRO').then(rows => { _maestro = rows; populateMaestroSelect(); });
 }
 
 // ─── NAVIGATION ──────────────────────────────────────────────────
@@ -1059,6 +1064,7 @@ function openFacturaModal() {
   ['fac-folio','fac-fecha','fac-cuit','fac-razon','fac-neto','fac-iva','fac-total','fac-nc-ref','fac-oc','fac-concepto','fac-notas','fac-tc','fac-imp-ext'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('fac-moneda').value='ARS';
   toggleMonedaExt();
+  populateMaestroSelect();
   openModal('modal-factura');
 }
 async function handleFacturaDrop(e) {
@@ -1093,6 +1099,10 @@ function fillFacturaForm(j) {
   document.getElementById('fac-tipo').value = esVenta ? 'venta' : 'compra';
   document.getElementById('fac-cuit').value = cuit||'';
   document.getElementById('fac-razon').value = razon||'';
+  if (cuit) {
+    const sel = document.getElementById('fac-maestro-sel');
+    if (sel) { const opt = [...sel.options].find(o=>o.value===cuit); if (opt) sel.value=cuit; }
+  }
   document.getElementById('fac-neto').value = j.monto_neto||'';
   document.getElementById('fac-iva').value = j.iva||'';
   document.getElementById('fac-total').value = j.total||'';
