@@ -440,6 +440,9 @@ tr:hover td{background:rgba(255,255,255,.03)}
           <p>Arrastrá o hacé click para subir PDF o imagen de la factura</p>
         </div>
         <input type="file" id="fac-file" accept=".pdf,image/*" style="display:none" onchange="handleFacturaFile(this)">
+        <div style="text-align:center;margin-top:8px">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="ingresarFacturaManual()"><i class="fa-solid fa-keyboard"></i> Ingresar manualmente</button>
+        </div>
         <div id="fac-loading" style="display:none" class="loading"><div class="spinner"></div> Analizando con IA...</div>
         <div id="fac-ai-info" class="ai-result" style="display:none"></div>
       </div>
@@ -548,36 +551,62 @@ tr:hover td{background:rgba(255,255,255,.03)}
 
   <!-- MODAL PAGO -->
   <div id="modal-pago" class="modal" style="display:none">
-    <div class="modal-header"><h3>Nuevo Pago</h3><button class="modal-close" onclick="closeModal('modal-pago')">×</button></div>
+    <div class="modal-header"><h3>Nueva Orden de Pago</h3><button class="modal-close" onclick="closeModal('modal-pago')">×</button></div>
     <div class="modal-body">
       <div class="form-row">
         <div class="form-group"><label>Fecha</label><input id="pa-fecha" type="date"></div>
-        <div class="form-group"><label>Factura</label>
-          <select id="pa-folio"><option value="">Seleccioná factura...</option></select>
+        <div class="form-group"><label>Proveedor</label>
+          <select id="pa-proveedor" onchange="filtrarFacturasPorProveedor()" style="width:100%">
+            <option value="">Seleccioná proveedor...</option>
+          </select>
         </div>
       </div>
-      <div class="form-group"><label>Monto pagado</label><input id="pa-monto" type="number" step="0.01"></div>
+      <div class="form-group" id="pa-facturas-group" style="display:none">
+        <label>Facturas a pagar</label>
+        <div id="pa-facturas-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--bg-2)"></div>
+      </div>
+      <div id="pa-saldo-info" style="display:none;background:var(--bg-2);border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px">
+        Saldo pendiente: <strong id="pa-saldo-val">$0</strong> &nbsp;|&nbsp; Total a pagar: <strong id="pa-total-val">$0</strong>
+      </div>
       <div class="form-group"><label>Medio de pago</label>
         <div class="radio-group">
           <label><input type="radio" name="pa-medio" value="transferencia" checked onchange="togglePaMedio()"> Transferencia</label>
-          <label><input type="radio" name="pa-medio" value="cheque" onchange="togglePaMedio()"> Cheque</label>
+          <label><input type="radio" name="pa-medio" value="cheque" onchange="togglePaMedio()"> E-Cheque / Cheque</label>
+          <label><input type="radio" name="pa-medio" value="mixto" onchange="togglePaMedio()"> Mixto</label>
         </div>
       </div>
       <div id="pa-transf-fields">
-        <div class="form-group"><label>N° operación</label><input id="pa-nop" type="text" placeholder="Opcional"></div>
+        <div class="form-row">
+          <div class="form-group"><label>Banco</label>
+            <select id="pa-banco-transf" style="width:100%">
+              <option value="">Sin especificar</option>
+              <option value="Galicia">Galicia</option>
+              <option value="Comercio">Banco Comercio</option>
+              <option value="Mercado Pago">Mercado Pago</option>
+              <option value="BBVA">BBVA</option>
+              <option value="Santander">Santander</option>
+              <option value="ICBC">ICBC</option>
+              <option value="Macro">Macro</option>
+              <option value="Nación">Nación</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+          <div class="form-group"><label>N° operación</label><input id="pa-nop" type="text" placeholder="Opcional"></div>
+        </div>
+        <div id="pa-monto-transf-group" class="form-group"><label>Monto transferencia</label><input id="pa-monto-transf" type="number" step="0.01" oninput="updatePaSaldo()"></div>
       </div>
       <div id="pa-cheque-fields" style="display:none">
-        <div class="form-row">
-          <div class="form-group"><label>Banco</label><input id="pa-banco" type="text"></div>
-          <div class="form-group"><label>Nro Cheque</label><input id="pa-nrocheque" type="text"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <label style="margin:0">E-Cheques / Cheques emitidos</label>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="addChequePago()"><i class="fa-solid fa-plus"></i> Agregar cheque</button>
         </div>
-        <div class="form-group"><label>Fecha Vencimiento</label><input id="pa-vencimiento" type="date"></div>
+        <div id="pa-cheques-list"></div>
       </div>
       <div class="form-group"><label>Notas</label><textarea id="pa-notas"></textarea></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-pago')">Cancelar</button>
-      <button id="pa-save-btn" class="btn btn-primary" onclick="savePago()">Guardar</button>
+      <button id="pa-save-btn" class="btn btn-primary" onclick="savePago()">Guardar y generar OP</button>
     </div>
   </div>
 
@@ -1118,6 +1147,12 @@ function fillFacturaForm(j) {
   document.getElementById('fac-form').style.display='block';
   document.getElementById('fac-save-btn').style.display='inline-flex';
 }
+function ingresarFacturaManual() {
+  document.getElementById('fac-dropzone').style.display='none';
+  document.getElementById('fac-fecha').value = today();
+  document.getElementById('fac-form').style.display='block';
+  document.getElementById('fac-save-btn').style.display='inline-flex';
+}
 function checkDuplicateFactura() {
   const folio = document.getElementById('fac-folio').value.trim();
   const tipo = document.getElementById('fac-tipo').value;
@@ -1576,10 +1611,10 @@ function descargarReciboCobro(idx) {
 
 // ─── PAGOS ───────────────────────────────────────────────────────
 let _pagos = [];
+function pagoFolios(r) { try { return JSON.parse(r[2]); } catch { return r[2] ? [r[2]] : []; } }
 async function loadAndRenderPagos() {
   _pagos = await sheetsGet('PAGOS');
   if (!_facturas.length) _facturas = await sheetsGet('FACTURAS');
-  populateFacturasSelect('pa-folio', 'compra');
   renderPagos();
 }
 function renderPagos() {
@@ -1591,70 +1626,138 @@ function renderPagos() {
     return true;
   });
   const tbody = document.getElementById('pa-tbody');
-  tbody.innerHTML = rows.length ? rows.map(r=>`<tr><td>${d(r[1])}</td><td>${r[2]}</td><td>${r[4]}</td><td>${fmtARS(r[5])}</td><td>${r[6]}</td><td>${r[7]||''}</td><td>${currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deletePago('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`).join('') : '<tr class="empty-row"><td colspan="7">Sin pagos registrados</td></tr>';
+  tbody.innerHTML = rows.length ? rows.map(r=>`<tr><td>${d(r[1])}</td><td>${pagoFolios(r).join(', ')}</td><td>${r[4]}</td><td>${fmtARS(r[5])}</td><td>${r[6]}</td><td>${r[7]||''}</td><td>${currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deletePago('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`).join('') : '<tr class="empty-row"><td colspan="7">Sin pagos registrados</td></tr>';
 }
 async function deletePago(id) {
-  if (!confirm('¿Eliminar este pago? Se revertirá el estado de la factura asociada.')) return;
+  if (!confirm('¿Eliminar esta orden de pago? Se revertirá el estado de las facturas asociadas.')) return;
   const pago = _pagos.find(r=>r[0]===id);
-  const folio = pago ? String(pago[2]) : null;
+  const folios = pago ? pagoFolios(pago) : [];
   await sheetsDelete('PAGOS', id);
   _pagos = _pagos.filter(r=>r[0]!==id);
-  if (folio) {
-    const fac = _facturas.find(r => String(r[2]) === folio);
-    if (fac) {
-      const totalPagado = _pagos.filter(r=>String(r[2])===folio).reduce((s,r)=>s+Number(r[5]||0),0);
-      const totalFac = Number(fac[9]||0);
-      const nuevoEstado = totalPagado <= 0 ? 'pendiente' : totalPagado >= totalFac ? 'pagada' : 'parcial';
-      await sheetsUpdateById('FACTURAS', fac[0], 'K', nuevoEstado);
-      fac[10] = nuevoEstado;
-    }
+  for (const folio of folios) {
+    const fac = _facturas.find(r => String(r[2]) === String(folio));
+    if (!fac) continue;
+    const totalPagado = _pagos.filter(r=>pagoFolios(r).includes(folio)).reduce((s,r)=>s+Number(r[5]||0),0);
+    const totalFac = Number(fac[9]||0);
+    const nuevoEstado = totalPagado <= 0 ? 'pendiente' : totalPagado >= totalFac ? 'pagada' : 'parcial';
+    await sheetsUpdateById('FACTURAS', fac[0], 'K', nuevoEstado);
+    fac[10] = nuevoEstado;
   }
-  renderPagos(); toast('Pago eliminado y factura actualizada');
+  renderPagos(); toast('Pago eliminado y facturas actualizadas');
+}
+let _paCheques = [];
+function populateProveedoresSelect() {
+  const sel = document.getElementById('pa-proveedor'); if (!sel) return;
+  const provs = {};
+  _facturas.filter(r => String(r[5]).toLowerCase()==='compra' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase()))
+    .forEach(r => { if (!provs[r[3]]) provs[r[3]] = r[4]; });
+  sel.innerHTML = '<option value="">Seleccioná proveedor...</option>' +
+    Object.entries(provs).sort((a,b)=>a[1].localeCompare(b[1])).map(([cuit,razon])=>`<option value="${cuit}" data-razon="${razon}">${razon}</option>`).join('');
+}
+function filtrarFacturasPorProveedor() {
+  const cuit = document.getElementById('pa-proveedor').value;
+  const group = document.getElementById('pa-facturas-group');
+  const list = document.getElementById('pa-facturas-list');
+  if (!cuit) { group.style.display='none'; document.getElementById('pa-saldo-info').style.display='none'; return; }
+  const facs = _facturas.filter(r => r[3]===cuit && String(r[5]).toLowerCase()==='compra' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase()));
+  list.innerHTML = facs.map(r => `<label style="display:flex;align-items:center;gap:8px;padding:6px;border-bottom:1px solid var(--border);cursor:pointer">
+    <input type="checkbox" class="pa-fac-cb" value="${r[2]}" data-id="${r[0]}" data-cuit="${r[3]}" data-razon="${r[4]}" data-total="${r[9]}" onchange="updatePaSaldo()">
+    <span>${r[2]}${r[13]?' — '+r[13]:''} · <strong>${fmtARS(r[9])}</strong> · ${stateBadge(r[10])}</span>
+  </label>`).join('') || '<p style="color:var(--muted);padding:8px;margin:0">Sin facturas pendientes</p>';
+  group.style.display = 'block';
+  document.getElementById('pa-saldo-info').style.display = 'block';
+  updatePaSaldo();
+}
+function addChequePago() {
+  const idx = Date.now();
+  _paCheques.push({idx, banco:'', nro:'', monto:0, vencimiento:''});
+  const div = document.createElement('div');
+  div.id = 'pa-cheque-'+idx;
+  div.style.cssText = 'background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px';
+  div.innerHTML = `<div class="form-row" style="align-items:flex-end;gap:6px">
+    <div class="form-group" style="flex:2;margin-bottom:0"><label style="font-size:11px">Banco</label><input type="text" placeholder="Banco" oninput="setPaChequeField(${idx},'banco',this.value)" style="width:100%"></div>
+    <div class="form-group" style="flex:2;margin-bottom:0"><label style="font-size:11px">Nro E-Cheque</label><input type="text" placeholder="Nro" oninput="setPaChequeField(${idx},'nro',this.value)" style="width:100%"></div>
+    <div class="form-group" style="flex:1.5;margin-bottom:0"><label style="font-size:11px">Monto</label><input type="number" step="0.01" placeholder="0" oninput="setPaChequeField(${idx},'monto',Number(this.value)||0);updatePaSaldo()" style="width:100%"></div>
+    <div class="form-group" style="flex:2;margin-bottom:0"><label style="font-size:11px">Vencimiento</label><input type="date" oninput="setPaChequeField(${idx},'vencimiento',this.value)" style="width:100%"></div>
+    <button type="button" onclick="removeChequePago(${idx})" style="background:#e53e3e;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;flex-shrink:0"><i class="fa-solid fa-trash"></i></button>
+  </div>`;
+  document.getElementById('pa-cheques-list').appendChild(div);
+  updatePaSaldo();
+}
+function setPaChequeField(idx,field,val){ const c=_paCheques.find(x=>x.idx===idx); if(c) c[field]=val; }
+function removeChequePago(idx){ _paCheques=_paCheques.filter(x=>x.idx!==idx); const el=document.getElementById('pa-cheque-'+idx); if(el) el.remove(); updatePaSaldo(); }
+function updatePaSaldo() {
+  const cbs = Array.from(document.querySelectorAll('.pa-fac-cb:checked'));
+  const totalFac = cbs.reduce((s,cb)=>s+Number(cb.dataset.total||0),0);
+  const totalCheques = _paCheques.filter(c=>Number(c.monto||0)>0 && c.banco && c.nro && c.vencimiento).reduce((s,c)=>s+Number(c.monto||0),0);
+  const montoTransf = Number(document.getElementById('pa-monto-transf')?.value||0);
+  const totalPagado = totalCheques + montoTransf;
+  const saldo = Math.max(0, totalFac - totalPagado);
+  document.getElementById('pa-saldo-val').textContent = fmtARS(saldo);
+  document.getElementById('pa-total-val').textContent = fmtARS(totalPagado);
 }
 function openPagosModal() {
   document.getElementById('pa-fecha').value=today();
-  document.getElementById('pa-monto').value='';
-  document.getElementById('pa-notas').value='';
   document.getElementById('pa-nop').value='';
-  document.getElementById('pa-banco').value='';
-  document.getElementById('pa-nrocheque').value='';
-  document.getElementById('pa-vencimiento').value='';
+  document.getElementById('pa-notas').value='';
+  if (document.getElementById('pa-monto-transf')) document.getElementById('pa-monto-transf').value='';
+  if (document.getElementById('pa-banco-transf')) document.getElementById('pa-banco-transf').value='';
+  document.getElementById('pa-facturas-group').style.display='none';
+  document.getElementById('pa-facturas-list').innerHTML='';
+  document.getElementById('pa-saldo-info').style.display='none';
+  document.getElementById('pa-cheques-list').innerHTML='';
+  document.getElementById('pa-proveedor').value='';
+  _paCheques=[];
   document.querySelector('input[name="pa-medio"][value="transferencia"]').checked=true;
   togglePaMedio();
-  populateFacturasSelect('pa-folio','compra');
+  document.getElementById('pa-save-btn').disabled=false;
+  if (!_facturas.length) sheetsGet('FACTURAS').then(rows=>{_facturas=rows;populateProveedoresSelect();});
+  else populateProveedoresSelect();
   openModal('modal-pago');
 }
 function togglePaMedio() {
   const medio=document.querySelector('input[name="pa-medio"]:checked').value;
-  document.getElementById('pa-transf-fields').style.display=medio==='transferencia'?'block':'none';
-  document.getElementById('pa-cheque-fields').style.display=medio==='cheque'?'block':'none';
+  document.getElementById('pa-transf-fields').style.display=(medio==='transferencia'||medio==='mixto')?'block':'none';
+  document.getElementById('pa-cheque-fields').style.display=(medio==='cheque'||medio==='mixto')?'block':'none';
+  const montoTransfGroup = document.getElementById('pa-monto-transf-group');
+  if (montoTransfGroup) montoTransfGroup.style.display = medio==='mixto'?'block':'none';
+  updatePaSaldo();
 }
 async function savePago() {
   const btn=document.getElementById('pa-save-btn'); btn.disabled=true;
-  const folio=document.getElementById('pa-folio').value;
-  const opt=document.querySelector(`#pa-folio option[value="${folio}"]`);
-  if (!folio||!opt){toast('Seleccioná una factura','error');btn.disabled=false;return;}
-  const facId=opt.dataset.id,cuit=opt.dataset.cuit,razon=opt.dataset.razon,totalFac=Number(opt.dataset.total);
+  const cbs = Array.from(document.querySelectorAll('.pa-fac-cb:checked'));
+  if (!cbs.length){toast('Seleccioná al menos una factura','error');btn.disabled=false;return;}
+  const folios = cbs.map(cb=>cb.value);
+  const cuit=cbs[0].dataset.cuit, razon=cbs[0].dataset.razon;
   const fecha=document.getElementById('pa-fecha').value;
-  const monto=Number(document.getElementById('pa-monto').value)||0;
   const medio=document.querySelector('input[name="pa-medio"]:checked').value;
-  const notas=medio==='transferencia'?(document.getElementById('pa-nop').value?'N° op: '+document.getElementById('pa-nop').value:''):'';
+  const chequesValidos = _paCheques.filter(c=>Number(c.monto||0)>0 && c.banco && c.nro && c.vencimiento);
+  const totalCheques = chequesValidos.reduce((s,c)=>s+Number(c.monto||0),0);
+  const montoTransf = (medio==='transferencia'||medio==='mixto') ? Number(document.getElementById('pa-monto-transf')?.value||0) : 0;
+  const monto = medio==='cheque' ? totalCheques : medio==='transferencia' ? montoTransf : montoTransf+totalCheques;
+  if (monto<=0){toast('El importe debe ser mayor a cero','error');btn.disabled=false;return;}
+  const nop=document.getElementById('pa-nop').value;
+  const banco=document.getElementById('pa-banco-transf')?.value||'';
+  const notas=document.getElementById('pa-notas').value;
   const id='PA'+Date.now();
-  const row=[id,fecha,folio,cuit,razon,monto,medio,notas];
+  const notasFull = [nop?'N° op: '+nop:'', banco?'Banco: '+banco:'', notas].filter(Boolean).join(' | ');
+  const row=[id,fecha,JSON.stringify(folios),cuit,razon,monto,medio,notasFull];
   try {
     await sheetsAppend('PAGOS',[row]); _pagos.push(row);
-    if (medio==='cheque') {
-      const ceId='CE'+Date.now();
-      const ceRow=[ceId,fecha,document.getElementById('pa-banco').value,document.getElementById('pa-nrocheque').value,cuit,razon,monto,document.getElementById('pa-vencimiento').value,folio,''];
+    for (const ch of chequesValidos) {
+      const ceId='CE'+Date.now()+Math.random().toString(36).slice(2,5);
+      const ceRow=[ceId,fecha,ch.banco,ch.nro,cuit,razon,ch.monto,ch.vencimiento,folios.join(', '),''];
       await sheetsAppend('CHEQUES_EMITIDOS',[ceRow]);
     }
-    const totalPagado=_pagos.filter(r=>r[2]===folio).reduce((s,r)=>s+Number(r[5]||0),0);
-    const nuevoEstado=totalPagado>=totalFac?'pagada':'parcial';
-    await sheetsUpdateById('FACTURAS',facId,'K',nuevoEstado);
-    const fi=_facturas.findIndex(r=>r[0]===facId);
-    if(fi>=0) _facturas[fi][10]=nuevoEstado;
-    generarPDFOrdenPago({fecha,folio,razon,cuit,monto,medio,banco:document.getElementById('pa-banco').value,nrocheque:document.getElementById('pa-nrocheque').value,vencimiento:document.getElementById('pa-vencimiento').value});
-    renderPagos(); closeModal('modal-pago'); toast('Pago registrado');
+    for (const cb of cbs) {
+      const facId=cb.dataset.id, totalFac=Number(cb.dataset.total);
+      const totalPagado=_pagos.filter(r=>{try{return JSON.parse(r[2]).includes(cb.value);}catch{return r[2]===cb.value;}}).reduce((s,r)=>s+Number(r[5]||0),0);
+      const nuevoEstado=totalPagado>=totalFac?'pagada':'parcial';
+      await sheetsUpdateById('FACTURAS',facId,'K',nuevoEstado);
+      const fi=_facturas.findIndex(r=>r[0]===facId); if(fi>=0) _facturas[fi][10]=nuevoEstado;
+    }
+    generarPDFOrdenPago({fecha,folios,razon,cuit,monto,medio,banco,nop,cheques:chequesValidos,montoTransf});
+    renderPagos(); closeModal('modal-pago'); toast('Orden de pago registrada');
   } catch(e){toast('Error: '+e.message,'error');btn.disabled=false;}
 }
 function exportPagosExcel() {
@@ -1663,15 +1766,29 @@ function exportPagosExcel() {
 }
 function generarPDFOrdenPago(data) {
   const {jsPDF}=window.jspdf; const doc=new jsPDF();
+  const W=210, M=14, MAG=[233,30,140];
   addLogoToPDF(doc);
   doc.setFontSize(16); doc.setTextColor(0); doc.text('Orden de Pago',70,16);
   doc.setFontSize(10); doc.setTextColor(150); doc.text('Brief Destroyers SA · CUIT: '+WTF_CUIT,70,23);
+  doc.setDrawColor(...MAG); doc.setLineWidth(1); doc.line(0,30,W,30);
   doc.setTextColor(0);
-  const body=[['Fecha',data.fecha],['Factura',data.folio],['Proveedor',data.razon+' ('+data.cuit+')'],['Monto',fmtARS(data.monto)],['Medio de pago',data.medio]];
-  if(data.medio==='cheque') body.push(['Banco',data.banco],['Nro Cheque',data.nrocheque],['Vencimiento',data.vencimiento]);
-  doc.autoTable({startY:35,body,styles:{fontSize:10},headStyles:{fillColor:[233,30,140]}});
-  doc.setFontSize(8);doc.setTextColor(150);doc.text('Brief Destroyers SA · Sistema WTF',14,doc.lastAutoTable.finalY+10);
-  doc.save(`orden_pago_${data.folio}_${data.fecha}.pdf`);
+  const foliosArr = Array.isArray(data.folios) ? data.folios : [data.folios||data.folio||''];
+  const info=[['Fecha', data.fecha||''],['Proveedor', (data.razon||'')+(data.cuit?' ('+data.cuit+')':'')],['Facturas', foliosArr.join(', ')],['Medio de pago', data.medio||''],['Total', fmtARS(data.monto)]];
+  if (data.banco) info.push(['Banco', data.banco]);
+  if (data.nop) info.push(['N° operación', data.nop]);
+  doc.autoTable({startY:35, body:info, styles:{fontSize:10}, columnStyles:{0:{fontStyle:'bold',cellWidth:45}}});
+  let y = doc.lastAutoTable.finalY + 8;
+  if (data.cheques && data.cheques.length) {
+    doc.setFontSize(10); doc.setTextColor(0); doc.setFont('helvetica','bold'); doc.text('E-Cheques / Cheques emitidos',M,y); y+=2;
+    doc.autoTable({startY:y, head:[['Banco','Nro','Monto','Vencimiento']], body:data.cheques.map(c=>[c.banco,c.nro,fmtARS(c.monto),c.vencimiento||'']), styles:{fontSize:9}, headStyles:{fillColor:MAG}});
+    y = doc.lastAutoTable.finalY + 8;
+  }
+  if (data.montoTransf > 0 && data.cheques?.length) {
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(100);
+    doc.text(`Transferencia: ${fmtARS(data.montoTransf)}`, M, y); y+=5;
+  }
+  doc.setFontSize(8); doc.setTextColor(150); doc.text('Brief Destroyers SA · Sistema WTF', M, y+6);
+  doc.save(`orden_pago_${foliosArr[0]}_${data.fecha}.pdf`);
 }
 
 // ─── RETENCIONES ─────────────────────────────────────────────────
@@ -1882,7 +1999,7 @@ function renderCCProveedores() {
   const entries=Object.values(provMap).filter(p=>!q||p.razon.toLowerCase().includes(q)||p.cuit.includes(q));
   if(!entries.length){list.innerHTML='<p style="color:var(--muted);padding:20px">Sin resultados</p>';return;}
   list.innerHTML=entries.map(p=>{
-    const totalFac=p.facturas.reduce((s,r)=>s+Number(r[9]||0),0);
+    const totalFac=p.facturas.filter(r=>String(r[10]).toLowerCase()!=='anulada').reduce((s,r)=>s+Number(r[9]||0),0);
     const totalPag=p.pagos.reduce((s,r)=>s+Number(r[5]||0),0);
     const totalChe=p.cheques.reduce((s,r)=>s+Number(r[6]||0),0);
     const saldo=totalFac-totalPag-totalChe;
