@@ -1199,10 +1199,22 @@ async function saveFactura() {
       if (ref) { await sheetsUpdateById('FACTURAS', ref[0], 'K', 'anulada'); ref[10]='anulada'; toast('Factura '+ref[2]+' marcada como anulada'); }
       else toast('NC guardada — factura referenciada no encontrada en el sistema','warning');
     }
+    autoRegistrarContacto(cuit, razon, tipo);
     renderFacturas();
     closeModal('modal-factura');
     toast('Factura guardada');
   } catch(e) { toast('Error guardando: ' + e.message, 'error'); btn.disabled = false; }
+}
+function autoRegistrarContacto(cuit, razon, tipoFac) {
+  if (!cuit || !razon) return;
+  const tipoContacto = tipoFac === 'venta' ? 'cliente' : 'proveedor';
+  const existe = _maestro.some(r => String(r[2]) === String(cuit));
+  if (existe) return;
+  const id = 'M'+Date.now();
+  const row = [id, razon, cuit, tipoContacto, 'responsable_inscripto', '', '', '', '', '', '', '', ''];
+  _maestro.push(row);
+  sheetsAppend('MAESTRO', [row]).catch(()=>{});
+  populateMaestroSelect();
 }
 function filteredFacturasRows() {
   const year = getFilter('f-year'), month = getFilter('f-month'), tipo = getFilter('f-tipo'), tipodoc = getFilter('f-tipodoc'), estado = getFilter('f-estado');
