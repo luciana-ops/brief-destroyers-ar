@@ -1623,7 +1623,7 @@ function descargarReciboCobro(idx) {
 
 // ─── PAGOS ───────────────────────────────────────────────────────
 let _pagos = [];
-function pagoFolios(r) { try { return JSON.parse(r[2]); } catch { return r[2] ? [r[2]] : []; } }
+function pagoFolios(r) { try { const v=JSON.parse(r[2]); return Array.isArray(v)?v:[String(r[2])]; } catch { return r[2]?[r[2]]:[]; } }
 async function loadAndRenderPagos() {
   _pagos = await sheetsGet('PAGOS');
   if (!_facturas.length) _facturas = await sheetsGet('FACTURAS');
