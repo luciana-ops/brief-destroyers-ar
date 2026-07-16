@@ -610,6 +610,44 @@ tr:hover td{background:rgba(255,255,255,.03)}
     </div>
   </div>
 
+  <!-- MODAL EDITAR PAGO -->
+  <div id="modal-edit-pago" class="modal" style="display:none">
+    <div class="modal-header"><h3>Editar Pago</h3><button class="modal-close" onclick="closeModal('modal-edit-pago')">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label>Fecha</label><input id="ep-fecha" type="date"></div>
+        <div class="form-group"><label>Monto total</label><input id="ep-monto" type="number" step="0.01"></div>
+      </div>
+      <div class="form-group"><label>Medio de pago</label>
+        <select id="ep-medio" style="width:100%">
+          <option value="transferencia">Transferencia</option>
+          <option value="cheque">Cheque / E-Cheque</option>
+          <option value="mixto">Mixto</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Banco</label>
+        <select id="ep-banco" style="width:100%">
+          <option value="">Sin especificar</option>
+          <option value="Galicia">Galicia</option>
+          <option value="Comercio">Banco Comercio</option>
+          <option value="Mercado Pago">Mercado Pago</option>
+          <option value="BBVA">BBVA</option>
+          <option value="Santander">Santander</option>
+          <option value="ICBC">ICBC</option>
+          <option value="Macro">Macro</option>
+          <option value="Nación">Nación</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+      <div class="form-group"><label>N° operación / referencia</label><input id="ep-nop" type="text"></div>
+      <div class="form-group"><label>Notas</label><textarea id="ep-notas"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-edit-pago')">Cancelar</button>
+      <button id="ep-save-btn" class="btn btn-primary" onclick="saveEditPago()">Guardar cambios</button>
+    </div>
+  </div>
+
   <!-- MODAL RETENCIÓN -->
   <div id="modal-retencion" class="modal" style="display:none">
     <div class="modal-header"><h3>Nueva Retención</h3><button class="modal-close" onclick="closeModal('modal-retencion')">×</button></div>
@@ -1027,6 +1065,7 @@ function renderFacturas() {
       <td>${stateBadge(String(r[10]).toLowerCase())}</td>
       <td>
         <button class="btn btn-secondary btn-sm" onclick='showDetalleFactura(${JSON.stringify(r)})'><i class="fa-solid fa-eye"></i></button>
+        <button class="btn btn-secondary btn-sm" onclick="editFactura('${r[0]}')"><i class="fa-solid fa-pen"></i></button>
         ${currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteFactura('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}
       </td>
     </tr>`).join('');
@@ -1080,7 +1119,10 @@ function calcIVA() {
   document.getElementById('fac-iva').readOnly = sinIVA;
   document.getElementById('fac-total').value = sinIVA ? neto.toFixed(2) : (neto * (1+IVA_RATE)).toFixed(2);
 }
+let _facturaEditId = null;
 function openFacturaModal() {
+  _facturaEditId = null;
+  document.getElementById('modal-factura').querySelector('h3').textContent = 'Nueva Factura';
   document.getElementById('fac-step1').style.display='block';
   document.getElementById('fac-form').style.display='none';
   document.getElementById('fac-save-btn').style.display='none';
@@ -1094,6 +1136,34 @@ function openFacturaModal() {
   document.getElementById('fac-moneda').value='ARS';
   toggleMonedaExt();
   populateMaestroSelect();
+  openModal('modal-factura');
+}
+function editFactura(id) {
+  const r = _facturas.find(x=>x[0]===id); if (!r) return;
+  _facturaEditId = id;
+  document.getElementById('modal-factura').querySelector('h3').textContent = 'Editar Factura';
+  document.getElementById('fac-step1').style.display='none';
+  document.getElementById('fac-form').style.display='block';
+  document.getElementById('fac-save-btn').style.display='inline-flex';
+  document.getElementById('fac-save-btn').disabled=false;
+  document.getElementById('fac-ai-info').style.display='none';
+  document.getElementById('fac-dup-warning').style.display='none';
+  document.getElementById('fac-folio').value=r[2]||'';
+  document.getElementById('fac-fecha').value=r[1]||'';
+  document.getElementById('fac-cuit').value=r[3]||'';
+  document.getElementById('fac-razon').value=r[4]||'';
+  document.getElementById('fac-tipo').value=r[5]||'venta';
+  document.getElementById('fac-tipodoc').value=r[6]||'A';
+  document.getElementById('fac-neto').value=Math.abs(Number(r[7]||0));
+  document.getElementById('fac-iva').value=Math.abs(Number(r[8]||0));
+  document.getElementById('fac-total').value=Math.abs(Number(r[9]||0));
+  document.getElementById('fac-notas').value=r[11]||'';
+  document.getElementById('fac-oc').value=r[12]||'';
+  document.getElementById('fac-concepto').value=r[13]||'';
+  document.getElementById('fac-moneda').value=r[14]||'ARS';
+  document.getElementById('fac-tc').value=r[15]||'';
+  document.getElementById('fac-imp-ext').value=r[16]||'';
+  toggleMonedaExt(); populateMaestroSelect();
   openModal('modal-factura');
 }
 async function handleFacturaDrop(e) {
@@ -1161,7 +1231,6 @@ function checkDuplicateFactura() {
 }
 async function saveFactura() {
   const btn = document.getElementById('fac-save-btn'); btn.disabled = true;
-  const id = 'F' + Date.now();
   const folio = document.getElementById('fac-folio').value.trim();
   const fecha = document.getElementById('fac-fecha').value;
   const cuit = document.getElementById('fac-cuit').value.trim();
@@ -1179,6 +1248,22 @@ async function saveFactura() {
   const impExt = Number(document.getElementById('fac-imp-ext').value)||'';
   const isNC = tipoDoc === 'NC';
   const notas = isNC && ncRef ? `NC - anula factura folio ${ncRef}` : document.getElementById('fac-notas').value;
+
+  if (_facturaEditId) {
+    const fac = _facturas.find(r=>r[0]===_facturaEditId);
+    const cols = ['B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q'];
+    const vals = [fecha, folio, cuit, razon, tipo, tipoDoc,
+      isNC?-Math.abs(neto):neto, isNC?-Math.abs(iva):iva, isNC?-Math.abs(total):total,
+      fac?fac[10]:'pendiente', notas, oc, concepto, moneda, tc, impExt];
+    try {
+      await Promise.all(cols.map((c,i)=>sheetsUpdateById('FACTURAS',_facturaEditId,c,vals[i])));
+      if (fac) { vals.forEach((v,i)=>fac[i+1]=v); }
+      renderFacturas(); closeModal('modal-factura'); toast('Factura actualizada');
+    } catch(e) { toast('Error: '+e.message,'error'); btn.disabled=false; }
+    return;
+  }
+
+  const id = 'F' + Date.now();
   const row = [id, fecha, folio, cuit, razon, tipo, tipoDoc,
     isNC ? -Math.abs(neto) : neto, isNC ? -Math.abs(iva) : iva, isNC ? -Math.abs(total) : total,
     isNC ? 'anulada' : 'pendiente', notas, oc, concepto, moneda, tc, impExt];
@@ -1638,7 +1723,45 @@ function renderPagos() {
     return true;
   });
   const tbody = document.getElementById('pa-tbody');
-  tbody.innerHTML = rows.length ? rows.map(r=>`<tr><td>${d(r[1])}</td><td>${pagoFolios(r).join(', ')}</td><td>${r[4]}</td><td>${fmtARS(r[5])}</td><td>${r[6]}</td><td>${r[7]||''}</td><td>${currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deletePago('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`).join('') : '<tr class="empty-row"><td colspan="7">Sin pagos registrados</td></tr>';
+  tbody.innerHTML = rows.length ? rows.map(r=>`<tr><td>${d(r[1])}</td><td>${pagoFolios(r).join(', ')}</td><td>${r[4]}</td><td>${fmtARS(r[5])}</td><td>${r[6]}</td><td>${r[7]||''}</td><td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="editPago('${r[0]}')"><i class="fa-solid fa-pen"></i></button>${currentUser.role==='admin'?` <button class="btn btn-danger btn-sm" onclick="deletePago('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`).join('') : '<tr class="empty-row"><td colspan="7">Sin pagos registrados</td></tr>';
+}
+let _pagoEditId = null;
+function editPago(id) {
+  const r = _pagos.find(x=>x[0]===id); if (!r) return;
+  _pagoEditId = id;
+  document.getElementById('ep-fecha').value = r[1]||'';
+  document.getElementById('ep-monto').value = r[5]||'';
+  document.getElementById('ep-medio').value = r[6]||'transferencia';
+  const notas = r[7]||'';
+  const bancoMatch = notas.match(/Banco: ([^|]+)/);
+  const nopMatch = notas.match(/N° op: ([^|]+)/);
+  document.getElementById('ep-banco').value = bancoMatch ? bancoMatch[1].trim() : '';
+  document.getElementById('ep-nop').value = nopMatch ? nopMatch[1].trim() : '';
+  document.getElementById('ep-notas').value = notas.replace(/Banco: [^|]+\|?\s*/g,'').replace(/N° op: [^|]+\|?\s*/g,'').trim();
+  document.getElementById('ep-save-btn').disabled = false;
+  openModal('modal-edit-pago');
+}
+async function saveEditPago() {
+  const btn = document.getElementById('ep-save-btn'); btn.disabled = true;
+  const fecha = document.getElementById('ep-fecha').value;
+  const monto = Number(document.getElementById('ep-monto').value)||0;
+  if (monto <= 0) { toast('El importe debe ser mayor a cero','error'); btn.disabled=false; return; }
+  const medio = document.getElementById('ep-medio').value;
+  const banco = document.getElementById('ep-banco').value;
+  const nop = document.getElementById('ep-nop').value;
+  const notas = document.getElementById('ep-notas').value;
+  const notasFull = [nop?'N° op: '+nop:'', banco?'Banco: '+banco:'', notas].filter(Boolean).join(' | ');
+  try {
+    await Promise.all([
+      sheetsUpdateById('PAGOS', _pagoEditId, 'B', fecha),
+      sheetsUpdateById('PAGOS', _pagoEditId, 'F', monto),
+      sheetsUpdateById('PAGOS', _pagoEditId, 'G', medio),
+      sheetsUpdateById('PAGOS', _pagoEditId, 'H', notasFull),
+    ]);
+    const idx = _pagos.findIndex(r=>r[0]===_pagoEditId);
+    if (idx>=0) { _pagos[idx][1]=fecha; _pagos[idx][5]=monto; _pagos[idx][6]=medio; _pagos[idx][7]=notasFull; }
+    renderPagos(); closeModal('modal-edit-pago'); toast('Pago actualizado');
+  } catch(e) { toast('Error: '+e.message,'error'); btn.disabled=false; }
 }
 async function deletePago(id) {
   if (!confirm('¿Eliminar esta orden de pago? Se revertirá el estado de las facturas asociadas.')) return;
@@ -1672,10 +1795,14 @@ function filtrarFacturasPorProveedor() {
   const list = document.getElementById('pa-facturas-list');
   if (!cuit) { group.style.display='none'; document.getElementById('pa-saldo-info').style.display='none'; return; }
   const facs = _facturas.filter(r => r[3]===cuit && String(r[5]).toLowerCase()==='compra' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase()));
-  list.innerHTML = facs.map(r => `<label style="display:flex;align-items:center;gap:8px;padding:6px;border-bottom:1px solid var(--border);cursor:pointer">
-    <input type="checkbox" class="pa-fac-cb" value="${r[2]}" data-id="${r[0]}" data-cuit="${r[3]}" data-razon="${r[4]}" data-total="${r[9]}" onchange="updatePaSaldo()">
-    <span>${r[2]}${r[13]?' — '+r[13]:''} · <strong>${fmtARS(r[9])}</strong> · ${stateBadge(r[10])}</span>
-  </label>`).join('') || '<p style="color:var(--muted);padding:8px;margin:0">Sin facturas pendientes</p>';
+  list.innerHTML = facs.map(r => {
+    const pagado = _pagos.filter(p=>pagoFolios(p).includes(r[2])).reduce((s,p)=>s+Number(p[5]||0),0);
+    const saldo = Math.max(0, Number(r[9]||0) - pagado);
+    return `<label style="display:flex;align-items:center;gap:8px;padding:6px;border-bottom:1px solid var(--border);cursor:pointer">
+      <input type="checkbox" class="pa-fac-cb" value="${r[2]}" data-id="${r[0]}" data-cuit="${r[3]}" data-razon="${r[4]}" data-total="${saldo}" onchange="updatePaSaldo()">
+      <span>${r[2]}${r[13]?' — '+r[13]:''} · Saldo: <strong>${fmtARS(saldo)}</strong>${pagado>0?' (total '+fmtARS(r[9])+')':''} · ${stateBadge(r[10])}</span>
+    </label>`;
+  }).join('') || '<p style="color:var(--muted);padding:8px;margin:0">Sin facturas pendientes</p>';
   group.style.display = 'block';
   document.getElementById('pa-saldo-info').style.display = 'block';
   updatePaSaldo();
@@ -2013,8 +2140,7 @@ function renderCCProveedores() {
   list.innerHTML=entries.map(p=>{
     const totalFac=p.facturas.filter(r=>String(r[10]).toLowerCase()!=='anulada').reduce((s,r)=>s+Number(r[9]||0),0);
     const totalPag=p.pagos.reduce((s,r)=>s+Number(r[5]||0),0);
-    const totalChe=p.cheques.reduce((s,r)=>s+Number(r[6]||0),0);
-    const saldo=totalFac-totalPag-totalChe;
+    const saldo=totalFac-totalPag;
     return `<div class="cc-card">
       <div class="cc-card-header" onclick="toggleCC(this)">
         <div><strong>${p.razon}</strong> <span style="color:var(--muted);font-size:12px">${p.cuit}</span></div>
