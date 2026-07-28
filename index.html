@@ -331,12 +331,15 @@ tr:hover td{background:rgba(255,255,255,.03)}
     </div>
     <div id="tab-cheques-recibidos" class="tab-panel active">
       <div class="filters">
-        <select id="cr-estado" onchange="renderChequesRecibidos()"><option value="">Todos</option><option value="en_cartera">En cartera</option><option value="depositado">Depositado</option><option value="rechazado">Rechazado</option></select>
+        <select id="cr-estado" onchange="renderChequesRecibidos()"><option value="">Todos</option><option value="en_cartera">En cartera</option><option value="depositado">Depositado</option><option value="cobrado">Cobrado</option><option value="debitado">Debitado</option><option value="rechazado">Rechazado</option><option value="devuelto">Devuelto</option></select>
       </div>
       <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Banco</th><th>Nro Cheque</th><th>De</th><th>Monto</th><th>Vencimiento</th><th>Factura</th><th>Estado</th><th></th></tr></thead><tbody id="cr-tbody"></tbody></table></div>
     </div>
     <div id="tab-cheques-emitidos" class="tab-panel">
-      <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Banco</th><th>Nro Cheque</th><th>A</th><th>Monto</th><th>Vencimiento</th><th>Factura</th></tr></thead><tbody id="ce-tbody"></tbody></table></div>
+      <div class="filters">
+        <select id="ce-estado" onchange="renderChequesEmitidos()"><option value="">Todos</option><option value="emitido">Emitido</option><option value="depositado">Depositado</option><option value="cobrado">Cobrado</option><option value="rechazado">Rechazado</option><option value="anulado">Anulado</option></select>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Banco</th><th>Nro Cheque</th><th>A</th><th>Monto</th><th>Vencimiento</th><th>Factura</th><th>Estado</th><th></th></tr></thead><tbody id="ce-tbody"></tbody></table></div>
     </div>
   </div>
 
@@ -1915,8 +1918,7 @@ function openPagosModal() {
   document.querySelector('input[name="pa-medio"][value="transferencia"]').checked=true;
   togglePaMedio();
   document.getElementById('pa-save-btn').disabled=false;
-  if (!_facturas.length) sheetsGet('FACTURAS').then(rows=>{_facturas=rows;populateProveedoresSelect();});
-  else populateProveedoresSelect();
+  Promise.all([sheetsGet('FACTURAS'),sheetsGet('PAGOS')]).then(([facs,pags])=>{_facturas=facs;_pagos=pags;populateProveedoresSelect();});
   openModal('modal-pago');
 }
 function togglePaMedio() {
@@ -2133,8 +2135,22 @@ async function updateChequeRec(id,estado) {
   renderChequesRecibidos();toast('Estado actualizado');
 }
 function renderChequesEmitidos() {
+  const estadoFilter=getFilter('ce-estado');
+  const estadosChequeEmi=['emitido','depositado','cobrado','rechazado','anulado'];
+  const rows=_chequesEmi.filter(r=>!estadoFilter||String(r[9]||'emitido').toLowerCase()===estadoFilter);
   const tbody=document.getElementById('ce-tbody');
-  tbody.innerHTML=_chequesEmi.length?_chequesEmi.map(r=>`<tr><td>${d(r[1])}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[5]}</td><td>${fmtARS(r[6])}</td><td>${d(r[7])}</td><td>${r[8]}</td></tr>`).join(''):'<tr class="empty-row"><td colspan="7">Sin cheques emitidos</td></tr>';
+  tbody.innerHTML=rows.length?rows.map(r=>{
+    const est=r[9]||'emitido';
+    return `<tr><td>${d(r[1])}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[5]}</td><td>${fmtARS(r[6])}</td><td>${d(r[7])}</td><td>${r[8]}</td><td>${badge(est,est)}</td><td>
+      <select onchange="updateChequeEmi('${r[0]}',this.value)" style="padding:4px 8px;background:var(--bg-2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
+        ${estadosChequeEmi.map(e=>`<option value="${e}"${e===est?' selected':''}>${e}</option>`).join('')}
+      </select></td></tr>`;
+  }).join(''):'<tr class="empty-row"><td colspan="9">Sin cheques emitidos</td></tr>';
+}
+async function updateChequeEmi(id,estado) {
+  await sheetsUpdateById('CHEQUES_EMITIDOS',id,'J',estado);
+  const i=_chequesEmi.findIndex(r=>r[0]===id);if(i>=0)_chequesEmi[i][9]=estado;
+  renderChequesEmitidos();toast('Estado actualizado');
 }
 
 // ─── CC CLIENTES ─────────────────────────────────────────────────
