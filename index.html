@@ -1926,7 +1926,7 @@ function togglePaMedio() {
   document.getElementById('pa-transf-fields').style.display=(medio==='transferencia'||medio==='mixto')?'block':'none';
   document.getElementById('pa-cheque-fields').style.display=(medio==='cheque'||medio==='mixto')?'block':'none';
   const montoTransfGroup = document.getElementById('pa-monto-transf-group');
-  if (montoTransfGroup) montoTransfGroup.style.display = medio==='mixto'?'block':'none';
+  if (montoTransfGroup) montoTransfGroup.style.display = (medio==='transferencia'||medio==='mixto')?'block':'none';
   updatePaSaldo();
 }
 async function savePago() {
