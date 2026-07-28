@@ -209,6 +209,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="nav-item" onclick="navigate('cc-proveedores')"><i class="fa-solid fa-truck"></i> CC Proveedores</div>
     <div class="nav-item" onclick="navigate('gastos')"><i class="fa-solid fa-receipt"></i> Gastos</div>
     <div class="nav-item" onclick="navigate('extracto')"><i class="fa-solid fa-building-columns"></i> Extracto</div>
+    <div class="nav-item" onclick="navigate('caja')"><i class="fa-solid fa-cash-register"></i> Caja</div>
     <div class="nav-item" onclick="navigate('maestro')"><i class="fa-solid fa-address-book"></i> Maestro</div>
   </nav>
   <div id="sidebar-footer">Sesión: <span id="user-label">—</span></div>
@@ -400,6 +401,40 @@ tr:hover td{background:rgba(255,255,255,.03)}
       <tbody id="g-tbody"></tbody></table>
     </div>
     <div style="text-align:right;margin-top:12px;font-size:16px;font-weight:700" id="g-total"></div>
+  </div>
+</div>
+
+<!-- CAJA -->
+<div id="section-caja" class="section">
+  <div class="page-header">
+    <h2><i class="fa-solid fa-cash-register"></i> Caja</h2>
+    <button class="btn btn-primary" onclick="openCajaModal()"><i class="fa-solid fa-plus"></i> Nuevo movimiento</button>
+  </div>
+  <div style="display:flex;gap:16px;margin-bottom:20px">
+    <div id="caja-saldo-ars" style="flex:1;background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:16px 20px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Saldo Caja ARS</div>
+      <div style="font-size:28px;font-weight:700" id="caja-saldo-ars-val">$ 0,00</div>
+    </div>
+    <div id="caja-saldo-usd" style="flex:1;background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:16px 20px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Saldo Caja USD</div>
+      <div style="font-size:28px;font-weight:700" id="caja-saldo-usd-val">USD 0,00</div>
+    </div>
+  </div>
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('caja','ars',this)">Caja ARS</div>
+    <div class="tab" onclick="switchTab('caja','usd',this)">Caja USD</div>
+  </div>
+  <div id="tab-caja-ars" class="tab-panel active">
+    <div class="table-wrap"><table>
+      <thead><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Monto</th><th>Saldo</th><th></th></tr></thead>
+      <tbody id="caja-tbody-ars"></tbody>
+    </table></div>
+  </div>
+  <div id="tab-caja-usd" class="tab-panel">
+    <div class="table-wrap"><table>
+      <thead><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Monto USD</th><th>Saldo USD</th><th></th></tr></thead>
+      <tbody id="caja-tbody-usd"></tbody>
+    </table></div>
   </div>
 </div>
 
@@ -607,6 +642,35 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-pago')">Cancelar</button>
       <button id="pa-save-btn" class="btn btn-primary" onclick="savePago()">Guardar y generar OP</button>
+    </div>
+  </div>
+
+  <!-- MODAL CAJA -->
+  <div id="modal-caja" class="modal" style="display:none">
+    <div class="modal-header"><h3>Nuevo movimiento de caja</h3><button class="modal-close" onclick="closeModal('modal-caja')">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label>Fecha</label><input id="cj-fecha" type="date"></div>
+        <div class="form-group"><label>Moneda</label>
+          <select id="cj-moneda" style="width:100%">
+            <option value="ARS">ARS — Pesos</option>
+            <option value="USD">USD — Dólares</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>Tipo</label>
+        <div class="radio-group">
+          <label><input type="radio" name="cj-tipo" value="ingreso" checked> Ingreso</label>
+          <label><input type="radio" name="cj-tipo" value="egreso"> Egreso</label>
+        </div>
+      </div>
+      <div class="form-group"><label>Monto</label><input id="cj-monto" type="number" step="0.01" placeholder="0,00"></div>
+      <div class="form-group"><label>Detalle</label><input id="cj-detalle" type="text" placeholder="Descripción del movimiento"></div>
+      <div class="form-group"><label>Notas (opcional)</label><textarea id="cj-notas" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-caja')">Cancelar</button>
+      <button id="cj-save-btn" class="btn btn-primary" onclick="saveCaja()">Guardar</button>
     </div>
   </div>
 
@@ -910,6 +974,7 @@ function navigate(section) {
   if (section === 'cc-proveedores') loadAndRenderCCProveedores();
   if (section === 'gastos') loadAndRenderGastos();
   if (section === 'extracto') loadAndRenderExtracto();
+  if (section === 'caja') loadAndRenderCaja();
   if (section === 'maestro') loadAndRenderMaestro();
 }
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
@@ -2320,6 +2385,78 @@ async function saveGasto() {
 function exportGastosExcel() {
   const data=[['Fecha','Descripción','Categoría','Monto','Medio de pago','Quién','Notas'],..._gastos.map(r=>[d(r[1]),r[2],r[3],r[4],r[7]||'',r[5],r[6]])];
   const ws=XLSX.utils.aoa_to_sheet(data);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Gastos');XLSX.writeFile(wb,'gastos.xlsx');
+}
+
+// ─── CAJA ────────────────────────────────────────────────────────
+let _caja = [];
+async function loadAndRenderCaja() {
+  _caja = await sheetsGet('CAJA');
+  renderCaja();
+}
+function renderCaja() {
+  ['ARS','USD'].forEach(mon => {
+    const movs = _caja.filter(r => String(r[3]).toUpperCase() === mon)
+      .sort((a,b) => String(a[1]).localeCompare(String(b[1])));
+    let saldo = 0;
+    const rows = movs.map(r => {
+      const monto = Number(r[4]||0);
+      saldo += r[2]==='ingreso' ? monto : -monto;
+      const color = r[2]==='ingreso' ? 'var(--green,#48bb78)' : 'var(--red,#f56565)';
+      const signo = r[2]==='ingreso' ? '+' : '-';
+      return `<tr>
+        <td>${d(r[1])}</td>
+        <td><span style="color:${color};font-weight:600;text-transform:capitalize">${r[2]}</span></td>
+        <td>${r[5]||''}${r[6]?`<br><small style="color:var(--muted)">${r[6]}</small>`:''}</td>
+        <td style="color:${color};font-weight:600">${signo}${mon==='USD'?'USD ':fmtARS(monto).replace('$','$ ')}${mon==='USD'?Number(monto).toLocaleString('es-AR',{minimumFractionDigits:2}):''}</td>
+        <td style="font-weight:700">${mon==='USD'?'USD '+Number(saldo).toLocaleString('es-AR',{minimumFractionDigits:2}):fmtARS(saldo)}</td>
+        <td>${currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteCaja('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}</td>
+      </tr>`;
+    }).reverse();
+    document.getElementById(`caja-tbody-${mon.toLowerCase()}`).innerHTML =
+      rows.length ? rows.join('') : `<tr class="empty-row"><td colspan="6">Sin movimientos</td></tr>`;
+    const saldoEl = document.getElementById(`caja-saldo-${mon.toLowerCase()}-val`);
+    if (saldoEl) {
+      saldoEl.textContent = mon==='USD' ? 'USD '+Number(saldo).toLocaleString('es-AR',{minimumFractionDigits:2}) : fmtARS(saldo);
+      saldoEl.style.color = saldo >= 0 ? 'var(--green,#48bb78)' : 'var(--red,#f56565)';
+    }
+  });
+}
+function openCajaModal() {
+  document.getElementById('cj-fecha').value = today();
+  document.getElementById('cj-moneda').value = 'ARS';
+  document.getElementById('cj-monto').value = '';
+  document.getElementById('cj-detalle').value = '';
+  document.getElementById('cj-notas').value = '';
+  document.querySelector('input[name="cj-tipo"][value="ingreso"]').checked = true;
+  document.getElementById('cj-save-btn').disabled = false;
+  openModal('modal-caja');
+}
+async function saveCaja() {
+  const btn = document.getElementById('cj-save-btn'); btn.disabled = true;
+  const fecha = document.getElementById('cj-fecha').value;
+  const tipo = document.querySelector('input[name="cj-tipo"]:checked').value;
+  const moneda = document.getElementById('cj-moneda').value;
+  const monto = Number(document.getElementById('cj-monto').value)||0;
+  const detalle = document.getElementById('cj-detalle').value.trim();
+  if (!fecha || monto <= 0 || !detalle) {
+    toast('Fecha, monto y detalle son obligatorios','error'); btn.disabled=false; return;
+  }
+  const id = 'CJ'+Date.now();
+  const row = [id, fecha, tipo, moneda, monto, detalle, document.getElementById('cj-notas').value.trim()];
+  try {
+    await sheetsAppend('CAJA',[row]);
+    _caja.push(row);
+    renderCaja();
+    closeModal('modal-caja');
+    toast('Movimiento registrado');
+  } catch(e) { toast('Error: '+e.message,'error'); btn.disabled=false; }
+}
+async function deleteCaja(id) {
+  if (!confirm('¿Eliminar este movimiento?')) return;
+  await sheetsDelete('CAJA', id);
+  _caja = _caja.filter(r=>r[0]!==id);
+  renderCaja();
+  toast('Movimiento eliminado');
 }
 
 // ─── EXTRACTO BANCARIO ───────────────────────────────────────────
