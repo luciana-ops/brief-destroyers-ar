@@ -1832,11 +1832,18 @@ async function saveEditPago() {
   } catch(e) { toast('Error: '+e.message,'error'); btn.disabled=false; }
 }
 async function deletePago(id) {
-  if (!confirm('¿Eliminar esta orden de pago? Se revertirá el estado de las facturas asociadas.')) return;
+  if (!confirm('¿Eliminar esta orden de pago? Se revertirán los estados de las facturas y se eliminarán los cheques asociados.')) return;
   const pago = _pagos.find(r=>r[0]===id);
   const folios = pago ? pagoFolios(pago) : [];
   await sheetsDelete('PAGOS', id);
   _pagos = _pagos.filter(r=>r[0]!==id);
+  // cascade: eliminar cheques emitidos generados por este pago
+  const allCheques = await sheetsGet('CHEQUES_EMITIDOS');
+  const foliosStr = folios.join(', ');
+  const chequesABorrar = allCheques.filter(r => r[4]===pago[3] && r[8]===foliosStr);
+  for (const che of chequesABorrar) await sheetsDelete('CHEQUES_EMITIDOS', che[0]);
+  _chequesEmi = _chequesEmi.filter(r => !chequesABorrar.some(c=>c[0]===r[0]));
+  // revertir estado de facturas
   for (const folio of folios) {
     const fac = _facturas.find(r => String(r[2]) === String(folio));
     if (!fac) continue;
@@ -1846,7 +1853,7 @@ async function deletePago(id) {
     await sheetsUpdateById('FACTURAS', fac[0], 'K', nuevoEstado);
     fac[10] = nuevoEstado;
   }
-  renderPagos(); toast('Pago eliminado y facturas actualizadas');
+  renderPagos(); toast(`Pago eliminado${chequesABorrar.length?' y '+chequesABorrar.length+' cheque(s) asociado(s) eliminado(s)':''}`);
 }
 let _paCheques = [];
 function populateProveedoresSelect() {
