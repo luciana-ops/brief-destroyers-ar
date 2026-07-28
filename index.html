@@ -2148,16 +2148,22 @@ function renderChequesEmitidos() {
   const tbody=document.getElementById('ce-tbody');
   tbody.innerHTML=rows.length?rows.map(r=>{
     const est=r[9]||'emitido';
-    return `<tr><td>${d(r[1])}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[5]}</td><td>${fmtARS(r[6])}</td><td>${d(r[7])}</td><td>${r[8]}</td><td>${badge(est,est)}</td><td>
+    return `<tr><td>${d(r[1])}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[5]}</td><td>${fmtARS(r[6])}</td><td>${d(r[7])}</td><td>${r[8]}</td><td>${badge(est,est)}</td><td style="white-space:nowrap">
       <select onchange="updateChequeEmi('${r[0]}',this.value)" style="padding:4px 8px;background:var(--bg-2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
         ${estadosChequeEmi.map(e=>`<option value="${e}"${e===est?' selected':''}>${e}</option>`).join('')}
-      </select></td></tr>`;
+      </select>${currentUser.role==='admin'?` <button class="btn btn-danger btn-sm" onclick="deleteChequeEmi('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`;
   }).join(''):'<tr class="empty-row"><td colspan="9">Sin cheques emitidos</td></tr>';
 }
 async function updateChequeEmi(id,estado) {
   await sheetsUpdateById('CHEQUES_EMITIDOS',id,'J',estado);
   const i=_chequesEmi.findIndex(r=>r[0]===id);if(i>=0)_chequesEmi[i][9]=estado;
   renderChequesEmitidos();toast('Estado actualizado');
+}
+async function deleteChequeEmi(id) {
+  if (!confirm('¿Eliminar este cheque emitido?')) return;
+  await sheetsDelete('CHEQUES_EMITIDOS', id);
+  _chequesEmi = _chequesEmi.filter(r=>r[0]!==id);
+  renderChequesEmitidos(); toast('Cheque eliminado');
 }
 
 // ─── CC CLIENTES ─────────────────────────────────────────────────
