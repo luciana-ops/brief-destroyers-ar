@@ -513,9 +513,16 @@ tr:hover td{background:rgba(255,255,255,.03)}
         </div>
         <div class="form-row">
           <div class="form-group"><label>Neto</label><input id="fac-neto" type="number" step="0.01" oninput="calcIVA()"></div>
-          <div class="form-group"><label id="fac-iva-label">IVA (21%)</label><input id="fac-iva" type="number" step="0.01"></div>
+          <div class="form-group"><label id="fac-iva-label">IVA (21%)</label><input id="fac-iva" type="number" step="0.01" oninput="calcTotal()"></div>
         </div>
         <div class="form-group"><label>Total (en pesos)</label><input id="fac-total" type="number" step="0.01"></div>
+        <div class="form-group">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <label style="margin:0;font-size:13px">Otros impuestos / Percepciones</label>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="addOtroImpuesto()"><i class="fa-solid fa-plus"></i> Agregar</button>
+          </div>
+          <div id="fac-otros-imp-list"></div>
+        </div>
         <div class="form-row" id="fac-moneda-group">
           <div class="form-group"><label>Moneda</label>
             <select id="fac-moneda" onchange="toggleMonedaExt()"><option value="ARS">ARS — Pesos</option><option value="USD">USD — Dólares</option><option value="EUR">EUR — Euros</option></select>
@@ -1185,8 +1192,27 @@ function calcIVA() {
   document.getElementById('fac-iva-label').textContent = sinIVA ? 'IVA (0% — sin IVA)' : 'IVA (21%)';
   document.getElementById('fac-iva').value = sinIVA ? '0' : (neto * IVA_RATE).toFixed(2);
   document.getElementById('fac-iva').readOnly = sinIVA;
-  document.getElementById('fac-total').value = sinIVA ? neto.toFixed(2) : (neto * (1+IVA_RATE)).toFixed(2);
+  calcTotal();
 }
+function calcTotal() {
+  const neto = Number(document.getElementById('fac-neto').value)||0;
+  const iva = Number(document.getElementById('fac-iva').value)||0;
+  const otros = _facOtrosImp.reduce((s,x)=>s+Number(x.monto||0),0);
+  document.getElementById('fac-total').value = (neto + iva + otros).toFixed(2);
+}
+let _facOtrosImp = [];
+function addOtroImpuesto(nombre='', monto='') {
+  const idx = Date.now() + Math.random();
+  _facOtrosImp.push({idx, nombre, monto: Number(monto)||0});
+  const div = document.createElement('div');
+  div.id = 'fac-oi-' + idx;
+  div.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px';
+  div.innerHTML = `<input type="text" placeholder="Ej: Percepción IVA, IIBB..." value="${nombre}" oninput="setFacOiField(${idx},'nombre',this.value)" style="flex:2;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-2);color:var(--text);font-size:13px"><input type="number" step="0.01" placeholder="0" value="${monto||''}" oninput="setFacOiField(${idx},'monto',Number(this.value)||0);calcTotal()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-2);color:var(--text);font-size:13px"><button type="button" onclick="removeFacOi(${idx})" style="background:#e53e3e;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;flex-shrink:0"><i class="fa-solid fa-trash"></i></button>`;
+  document.getElementById('fac-otros-imp-list').appendChild(div);
+  calcTotal();
+}
+function setFacOiField(idx,field,val){const x=_facOtrosImp.find(i=>i.idx===idx);if(x)x[field]=val;}
+function removeFacOi(idx){_facOtrosImp=_facOtrosImp.filter(i=>i.idx!==idx);const el=document.getElementById('fac-oi-'+idx);if(el)el.remove();calcTotal();}
 let _facturaEditId = null;
 function openFacturaModal() {
   _facturaEditId = null;
@@ -1201,6 +1227,7 @@ function openFacturaModal() {
   document.getElementById('fac-file').value='';
   document.getElementById('fac-dropzone').style.display='';
   ['fac-folio','fac-fecha','fac-cuit','fac-razon','fac-neto','fac-iva','fac-total','fac-nc-ref','fac-oc','fac-concepto','fac-notas','fac-tc','fac-imp-ext'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  _facOtrosImp=[]; document.getElementById('fac-otros-imp-list').innerHTML='';
   document.getElementById('fac-moneda').value='ARS';
   toggleMonedaExt();
   populateMaestroSelect();
@@ -1231,6 +1258,8 @@ function editFactura(id) {
   document.getElementById('fac-moneda').value=r[14]||'ARS';
   document.getElementById('fac-tc').value=r[15]||'';
   document.getElementById('fac-imp-ext').value=r[16]||'';
+  _facOtrosImp=[]; document.getElementById('fac-otros-imp-list').innerHTML='';
+  try{(r[17]?JSON.parse(r[17]):[]).forEach(oi=>addOtroImpuesto(oi.nombre,oi.monto));}catch{}
   toggleMonedaExt(); populateMaestroSelect();
   openModal('modal-factura');
 }
@@ -1245,7 +1274,7 @@ async function processFacturaFile(file) {
   try {
     const base64 = await fileToBase64(file);
     const mediaType = file.type === 'application/pdf' ? 'application/pdf' : file.type;
-    const prompt = `Extraé del comprobante en JSON estricto (sin markdown): numero_folio, fecha (YYYY-MM-DD), cuit_emisor (formato XX-XXXXXXXX-X), razon_emisor, cuit_receptor (formato XX-XXXXXXXX-X), razon_receptor, tipo_comprobante (A/B/C/NC/FCEA/FCEB/FCEC — usar FCEA/FCEB/FCEC cuando el comprobante dice "Factura de Crédito Electrónica MiPyME"), moneda (ARS/USD/EUR — moneda en que está expresada la factura), tipo_cambio (número — tipo de cambio AFIP usado si es moneda extranjera, sino null), importe_moneda_original (número — importe NETO en la moneda extranjera original si aplica, sino null), monto_neto (número en PESOS ARGENTINOS — si la factura es en moneda extranjera usar el importe convertido a pesos que figura al pie del comprobante; para Factura C monto_neto es igual al total), iva (número en PESOS — 0 para Factura C o moneda extranjera sin IVA separado), total (número en PESOS ARGENTINOS — siempre el total en pesos del pie del comprobante), es_nota_credito (boolean), folio_referencia (string o null), orden_compra (string o null), concepto (descripción breve del servicio, máximo 6 palabras, ej: "Fee junio 2026", "Producción libretos"). Solo JSON.`;
+    const prompt = `Extraé del comprobante en JSON estricto (sin markdown): numero_folio, fecha (YYYY-MM-DD), cuit_emisor (formato XX-XXXXXXXX-X), razon_emisor, cuit_receptor (formato XX-XXXXXXXX-X), razon_receptor, tipo_comprobante (A/B/C/NC/FCEA/FCEB/FCEC — usar FCEA/FCEB/FCEC cuando el comprobante dice "Factura de Crédito Electrónica MiPyME"), moneda (ARS/USD/EUR — moneda en que está expresada la factura), tipo_cambio (número — tipo de cambio AFIP usado si es moneda extranjera, sino null), importe_moneda_original (número — importe NETO en la moneda extranjera original si aplica, sino null), monto_neto (número en PESOS ARGENTINOS — si la factura es en moneda extranjera usar el importe convertido a pesos que figura al pie del comprobante; para Factura C monto_neto es igual al total), iva (número en PESOS — 0 para Factura C o moneda extranjera sin IVA separado), otros_impuestos (array de objetos {nombre, monto} en PESOS — incluir percepciones de IVA, percepciones de IIBB, impuestos internos u otros impuestos que figuren en el comprobante además del IVA; array vacío [] si no hay), total (número en PESOS ARGENTINOS — siempre el total en pesos del pie del comprobante, incluyendo todos los impuestos), es_nota_credito (boolean), folio_referencia (string o null), orden_compra (string o null), concepto (descripción breve del servicio, máximo 6 palabras, ej: "Fee junio 2026", "Producción libretos"). Solo JSON.`;
     const raw = await callClaude(base64, mediaType, prompt);
     const json = JSON.parse(raw.replace(/```json\n?|\n?```/g,'').trim());
     fillFacturaForm(json);
@@ -1272,6 +1301,8 @@ function fillFacturaForm(j) {
   }
   document.getElementById('fac-neto').value = j.monto_neto||'';
   document.getElementById('fac-iva').value = j.iva||'';
+  _facOtrosImp=[]; document.getElementById('fac-otros-imp-list').innerHTML='';
+  (j.otros_impuestos||[]).forEach(oi=>addOtroImpuesto(oi.nombre,oi.monto));
   document.getElementById('fac-total').value = j.total||'';
   document.getElementById('fac-nc-ref-group').style.display = j.es_nota_credito ? 'block' : 'none';
   document.getElementById('fac-nc-ref').value = j.folio_referencia||'';
@@ -1316,13 +1347,14 @@ async function saveFactura() {
   const impExt = Number(document.getElementById('fac-imp-ext').value)||'';
   const isNC = tipoDoc === 'NC';
   const notas = isNC && ncRef ? `NC - anula factura folio ${ncRef}` : document.getElementById('fac-notas').value;
+  const otrosImpJSON = _facOtrosImp.length ? JSON.stringify(_facOtrosImp.map(x=>({nombre:x.nombre,monto:x.monto}))) : '';
 
   if (_facturaEditId) {
     const fac = _facturas.find(r=>r[0]===_facturaEditId);
-    const cols = ['B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q'];
+    const cols = ['B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R'];
     const vals = [fecha, folio, cuit, razon, tipo, tipoDoc,
       isNC?-Math.abs(neto):neto, isNC?-Math.abs(iva):iva, isNC?-Math.abs(total):total,
-      fac?fac[10]:'pendiente', notas, oc, concepto, moneda, tc, impExt];
+      fac?fac[10]:'pendiente', notas, oc, concepto, moneda, tc, impExt, otrosImpJSON];
     try {
       await Promise.all(cols.map((c,i)=>sheetsUpdateById('FACTURAS',_facturaEditId,c,vals[i])));
       if (fac) { vals.forEach((v,i)=>fac[i+1]=v); }
@@ -1334,7 +1366,7 @@ async function saveFactura() {
   const id = 'F' + Date.now();
   const row = [id, fecha, folio, cuit, razon, tipo, tipoDoc,
     isNC ? -Math.abs(neto) : neto, isNC ? -Math.abs(iva) : iva, isNC ? -Math.abs(total) : total,
-    isNC ? 'anulada' : 'pendiente', notas, oc, concepto, moneda, tc, impExt];
+    isNC ? 'anulada' : 'pendiente', notas, oc, concepto, moneda, tc, impExt, otrosImpJSON];
   try {
     await sheetsAppend('FACTURAS', [row]);
     _facturas.push(row);
