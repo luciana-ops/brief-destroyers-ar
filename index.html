@@ -1892,7 +1892,7 @@ function populateProveedoresSelect() {
   const sel = document.getElementById('pa-proveedor'); if (!sel) return;
   const provs = {};
   _facturas.filter(r => String(r[5]).toLowerCase()==='compra' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase()))
-    .forEach(r => { if (!provs[r[3]]) provs[r[3]] = r[4]; });
+    .forEach(r => { const k=String(r[3]).trim(); if (!provs[k]) provs[k] = r[4]; });
   sel.innerHTML = '<option value="">Seleccioná proveedor...</option>' +
     Object.entries(provs).sort((a,b)=>a[1].localeCompare(b[1])).map(([cuit,razon])=>`<option value="${cuit}" data-razon="${razon}">${razon}</option>`).join('');
 }
@@ -1901,7 +1901,7 @@ function filtrarFacturasPorProveedor() {
   const group = document.getElementById('pa-facturas-group');
   const list = document.getElementById('pa-facturas-list');
   if (!cuit) { group.style.display='none'; document.getElementById('pa-saldo-info').style.display='none'; return; }
-  const facs = _facturas.filter(r => r[3]===cuit && String(r[5]).toLowerCase()==='compra' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase()));
+  const facs = _facturas.filter(r => String(r[3]).trim()===String(cuit).trim() && String(r[5]).toLowerCase()==='compra' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase()));
   list.innerHTML = facs.map(r => {
     const pagado = _pagos.filter(p=>pagoFolios(p).includes(r[2])).reduce((s,p)=>s+Number(p[5]||0),0);
     const saldo = Math.max(0, Number(r[9]||0) - pagado);
