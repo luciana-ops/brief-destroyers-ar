@@ -1325,7 +1325,16 @@ function ingresarFacturaManual() {
 function checkDuplicateFactura() {
   const folio = document.getElementById('fac-folio').value.trim();
   const tipo = document.getElementById('fac-tipo').value;
-  const dup = _facturas.some(r => String(r[2]).trim() === folio && String(r[5]).toLowerCase() === tipo);
+  const tipoDoc = document.getElementById('fac-tipodoc').value;
+  const cuit = document.getElementById('fac-cuit').value.trim();
+  if (!folio || !cuit) { document.getElementById('fac-dup-warning').style.display='none'; return; }
+  const dup = _facturas.some(r =>
+    String(r[2]).trim() === folio &&
+    String(r[5]).toLowerCase() === tipo &&
+    String(r[6]).toUpperCase() === tipoDoc.toUpperCase() &&
+    String(r[3]).trim() === cuit &&
+    (!_facturaEditId || r[0] !== _facturaEditId)
+  );
   document.getElementById('fac-dup-warning').style.display = dup ? 'block' : 'none';
 }
 async function saveFactura() {
