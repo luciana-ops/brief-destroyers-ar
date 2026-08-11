@@ -1494,7 +1494,7 @@ function filtrarFacturasPorCliente() {
   const cuit = document.getElementById('co-cliente').value;
   const group = document.getElementById('co-facturas-group');
   if (!cuit) { group.style.display='none'; updateCoSaldo(); return; }
-  const opts = _facturas.filter(r => String(r[5]).toLowerCase()==='venta' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase()) && r[3]===cuit);
+  const opts = _facturas.filter(r => String(r[5]).toLowerCase()==='venta' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase()) && String(r[3]).trim()===String(cuit).trim());
   const list = document.getElementById('co-facturas-list');
   list.innerHTML = opts.length ? opts.map(r=>`<label style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"><input type="checkbox" class="co-fac-cb" value="${r[2]}" data-id="${r[0]}" data-cuit="${r[3]}" data-razon="${r[4]}" data-total="${r[9]}" data-moneda="${r[14]||'ARS'}" data-concepto="${r[5]||''}" onchange="updateCoSaldo()"> <span style="flex:1">${r[2]} · <span style="color:var(--text-muted);font-size:12px">${d(r[1])}</span></span><strong>${fmtARS(r[9])}</strong></label>`).join('') : '<p style="color:var(--text-muted);font-size:13px;margin:0">No hay facturas pendientes para este cliente</p>';
   group.style.display = 'block';
@@ -1608,9 +1608,9 @@ function openCobrosModal() {
   document.getElementById('co-facturas-group').style.display = 'none';
   document.getElementById('co-facturas-list').innerHTML = '';
   document.getElementById('co-cliente').value = '';
-  populateCoClientes();
   updateCoSaldo();
   openModal('modal-cobro');
+  sheetsGet('FACTURAS').then(facs=>{ _facturas=facs; populateCoClientes(); });
 }
 let _coCheques = [];
 function addChequeCobro() {
