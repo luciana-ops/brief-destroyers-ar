@@ -1585,6 +1585,7 @@ async function deleteCobro(id) {
   const folios = cobro ? cobroFolios(cobro) : [];
   await sheetsDelete('COBROS', id);
   _cobros = _cobros.filter(r=>r[0]!==id);
+  _facturas = await sheetsGet('FACTURAS');
   for (const folio of folios) {
     const fac = _facturas.find(r => String(r[2]) === String(folio));
     if (!fac) continue;
@@ -1810,7 +1811,7 @@ function descargarReciboCobro(idx) {
   const monto = Number(row[5]);
   const retTotal = rets.reduce((s,r)=>s+Number(r.monto||0),0);
   const facturas = folios.map(folio => {
-    const fac = _facturas.find(f=>f[2]===folio);
+    const fac = _facturas.find(f=>String(f[2])===String(folio));
     return {folio, concepto:fac?.[5]||'', moneda:fac?.[6]||'ARS', total:Number(fac?.[9]||0)};
   });
   generarReciboCliente({fecha:row[1], folios, razon:row[4], cuit:row[3], monto, montoTransf, nop, medio:row[6], notas:row[7]||'', retenciones:rets, retTotal, cheques, facturas, nro:idx+1});
@@ -1882,7 +1883,7 @@ async function deletePago(id) {
   // cascade: eliminar cheques emitidos generados por este pago
   const allCheques = await sheetsGet('CHEQUES_EMITIDOS');
   const foliosStr = folios.join(', ');
-  const chequesABorrar = allCheques.filter(r => r[4]===pago[3] && r[8]===foliosStr);
+  const chequesABorrar = allCheques.filter(r => String(r[4]).trim()===String(pago[3]).trim() && String(r[8]).trim()===foliosStr.trim());
   for (const che of chequesABorrar) await sheetsDelete('CHEQUES_EMITIDOS', che[0]);
   _chequesEmi = _chequesEmi.filter(r => !chequesABorrar.some(c=>c[0]===r[0]));
   // revertir estado de facturas
@@ -2005,9 +2006,11 @@ async function savePago() {
       await sheetsAppend('CHEQUES_EMITIDOS',[ceRow]);
     }
     for (const cb of cbs) {
-      const facId=cb.dataset.id, totalFac=Number(cb.dataset.total);
-      const totalPagado=_pagos.filter(r=>{try{return JSON.parse(r[2]).includes(cb.value);}catch{return r[2]===cb.value;}}).reduce((s,r)=>s+Number(r[5]||0),0);
-      const nuevoEstado=totalPagado>=totalFac?'pagada':'parcial';
+      const facId=cb.dataset.id;
+      const fac=_facturas.find(r=>r[0]===facId);
+      const realTotal=fac?Math.abs(Number(fac[9]||0)):Number(cb.dataset.total);
+      const totalPagado=_pagos.filter(r=>{try{return JSON.parse(r[2]).includes(cb.value);}catch{return String(r[2])===String(cb.value);}}).reduce((s,r)=>s+Number(r[5]||0),0);
+      const nuevoEstado=totalPagado>=realTotal?'pagada':totalPagado>0?'parcial':'pendiente';
       await sheetsUpdateById('FACTURAS',facId,'K',nuevoEstado);
       const fi=_facturas.findIndex(r=>r[0]===facId); if(fi>=0) _facturas[fi][10]=nuevoEstado;
     }
