@@ -1126,25 +1126,29 @@ function renderFacturas() {
     <div class="t-item"><div class="t-label">Total USD</div><div class="t-val">${fmtUSD(sumTotal)}</div></div>`;
   const tbody = document.getElementById('f-tbody');
   if (!rows.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="12">Sin facturas para los filtros seleccionados</td></tr>'; return; }
-  tbody.innerHTML = rows.map(r => `
-    <tr>
+  tbody.innerHTML = rows.map(r => {
+    const isNCrow = String(r[6]).toUpperCase() === 'NC';
+    const red = isNCrow ? ' style="color:#e53e3e"' : '';
+    return `
+    <tr${isNCrow ? ' style="background:rgba(229,62,62,0.05)"' : ''}>
       <td>${d(r[1])}</td>
-      <td><strong>${r[2]}</strong></td>
+      <td><strong${red}>${r[2]}</strong></td>
       <td>${docBadge(String(r[6]).toUpperCase())}</td>
       <td>${badge(String(r[5]).toLowerCase()==='venta'?'Venta':'Compra', String(r[5]).toLowerCase())}</td>
       <td>${r[4]}<br><small style="color:var(--muted)">${r[3]}</small></td>
-      <td style="font-size:12px;color:var(--muted)">${String(r[6]).toUpperCase()==='NC'?`<span style="color:var(--red)">${r[11]||''}</span>`:(r[13]||'')}</td>
+      <td style="font-size:12px;color:var(--muted)">${isNCrow?`<span style="color:#e53e3e">${r[11]||''}</span>`:(r[13]||'')}</td>
       <td style="font-size:12px;color:var(--muted)">${r[12]||''}</td>
-      <td>${fmtARS(r[7])}</td>
-      <td>${fmtARS(r[8])}</td>
-      <td><strong>${fmtARS(r[9])}</strong>${r[14]&&r[14]!=='ARS'?`<br><small style="color:var(--accent);font-size:11px">${r[14]} ${Number(r[16]||0).toLocaleString('es-AR',{minimumFractionDigits:2})} · TC ${r[15]}</small>`:''}</td>
+      <td${red}>${fmtARS(r[7])}</td>
+      <td${red}>${fmtARS(r[8])}</td>
+      <td><strong${red}>${fmtARS(r[9])}</strong>${r[14]&&r[14]!=='ARS'?`<br><small style="color:var(--accent);font-size:11px">${r[14]} ${Number(r[16]||0).toLocaleString('es-AR',{minimumFractionDigits:2})} · TC ${r[15]}</small>`:''}</td>
       <td>${stateBadge(String(r[10]).toLowerCase())}</td>
       <td>
         <button class="btn btn-secondary btn-sm" onclick='showDetalleFactura(${JSON.stringify(r)})'><i class="fa-solid fa-eye"></i></button>
         <button class="btn btn-secondary btn-sm" onclick="editFactura('${r[0]}')"><i class="fa-solid fa-pen"></i></button>
         ${currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteFactura('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 function showDetalleFactura(r) {
   document.getElementById('detalle-body').innerHTML = `
@@ -1376,7 +1380,7 @@ async function saveFactura() {
   const id = 'F' + Date.now();
   const row = [id, fecha, folio, cuit, razon, tipo, tipoDoc,
     isNC ? -Math.abs(neto) : neto, isNC ? -Math.abs(iva) : iva, isNC ? -Math.abs(total) : total,
-    isNC ? 'anulada' : 'pendiente', notas, oc, concepto, moneda, tc, impExt, otrosImpJSON];
+    'pendiente', notas, oc, concepto, moneda, tc, impExt, otrosImpJSON];
   try {
     await sheetsAppend('FACTURAS', [row]);
     _facturas.push(row);
@@ -1496,7 +1500,13 @@ function filtrarFacturasPorCliente() {
   if (!cuit) { group.style.display='none'; updateCoSaldo(); return; }
   const opts = _facturas.filter(r => String(r[5]).toLowerCase()==='venta' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase()) && String(r[3]).trim()===String(cuit).trim());
   const list = document.getElementById('co-facturas-list');
-  list.innerHTML = opts.length ? opts.map(r=>`<label style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"><input type="checkbox" class="co-fac-cb" value="${r[2]}" data-id="${r[0]}" data-cuit="${r[3]}" data-razon="${r[4]}" data-total="${r[9]}" data-moneda="${r[14]||'ARS'}" data-concepto="${r[5]||''}" onchange="updateCoSaldo()"> <span style="flex:1">${r[2]} · <span style="color:var(--text-muted);font-size:12px">${d(r[1])}</span></span><strong>${fmtARS(r[9])}</strong></label>`).join('') : '<p style="color:var(--text-muted);font-size:13px;margin:0">No hay facturas pendientes para este cliente</p>';
+  list.innerHTML = opts.length ? opts.map(r=>{
+    const isNC = String(r[6]).toUpperCase()==='NC';
+    const rowStyle = isNC ? 'background:rgba(229,62,62,0.05);' : '';
+    const textColor = isNC ? 'color:#e53e3e;' : '';
+    const ncBadge = isNC ? '<span style="background:#e53e3e;color:#fff;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:700;flex-shrink:0">NC</span> ' : '';
+    return `<label style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);${rowStyle}"><input type="checkbox" class="co-fac-cb" value="${r[2]}" data-id="${r[0]}" data-cuit="${r[3]}" data-razon="${r[4]}" data-total="${r[9]}" data-moneda="${r[14]||'ARS'}" data-concepto="${r[5]||''}" onchange="updateCoSaldo()"> ${ncBadge}<span style="flex:1;${textColor}">${r[2]} · <span style="color:var(--text-muted);font-size:12px">${d(r[1])}</span></span><strong style="${textColor}">${fmtARS(r[9])}</strong></label>`;
+  }).join('') : '<p style="color:var(--text-muted);font-size:13px;margin:0">No hay facturas pendientes para este cliente</p>';
   group.style.display = 'block';
   updateCoSaldo();
 }
