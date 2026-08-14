@@ -1684,7 +1684,7 @@ async function saveCobro() {
     }
     const facturaDetails = cbs.map(cb=>({folio:cb.value, concepto:cb.dataset.concepto||'', moneda:cb.dataset.moneda||'ARS', total:Number(cb.dataset.total||0)}));
     generarReciboCliente({fecha, folios, razon, cuit, monto, montoTransf, nop, medio, notas, retenciones:rets, retTotal, cheques:_coCheques, facturas:facturaDetails, nro:_cobros.length});
-    renderCobros(); closeModal('modal-cobro'); toast('Cobro registrado');
+    btn.disabled=false; renderCobros(); closeModal('modal-cobro'); toast('Cobro registrado');
   } catch(e) { toast('Error: '+e.message,'error'); btn.disabled=false; }
 }
 function exportCobrosExcel() {
