@@ -1380,7 +1380,7 @@ async function saveFactura() {
   const id = 'F' + Date.now();
   const row = [id, fecha, folio, cuit, razon, tipo, tipoDoc,
     isNC ? -Math.abs(neto) : neto, isNC ? -Math.abs(iva) : iva, isNC ? -Math.abs(total) : total,
-    'pendiente', notas, oc, concepto, moneda, tc, impExt, otrosImpJSON];
+    isNC ? 'anulada' : 'pendiente', notas, oc, concepto, moneda, tc, impExt, otrosImpJSON];
   try {
     await sheetsAppend('FACTURAS', [row]);
     _facturas.push(row);
