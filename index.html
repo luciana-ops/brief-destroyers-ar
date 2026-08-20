@@ -535,7 +535,11 @@ tr:hover td{background:rgba(255,255,255,.03)}
           <div class="form-group"><label>Orden de compra (OC)</label><input id="fac-oc" type="text" placeholder="Nro de OC si figura"></div>
           <div class="form-group"><label>Concepto</label><input id="fac-concepto" type="text" placeholder="Ej: Fee junio, Producción libretos"></div>
         </div>
-        <div id="fac-nc-ref-group" class="form-group" style="display:none"><label>Folio que anula (NC)</label><input id="fac-nc-ref" type="text"></div>
+        <div id="fac-nc-ref-group" class="form-group" style="display:none">
+          <label>Factura que anula</label>
+          <select id="fac-nc-ref-sel" onchange="onNcRefSel(this)" style="width:100%;margin-bottom:6px"><option value="">— Seleccioná del listado —</option></select>
+          <input id="fac-nc-ref" type="text" placeholder="O escribí el folio manualmente">
+        </div>
         <div class="form-group"><label>Notas</label><textarea id="fac-notas"></textarea></div>
         <div id="fac-dup-warning" style="display:none;color:var(--red);font-size:13px;margin-bottom:10px"><i class="fa-solid fa-triangle-exclamation"></i> Este folio ya existe — verificá si es un duplicado.</div>
       </div>
@@ -1115,12 +1119,18 @@ async function loadAndRenderFacturas() {
     const match = notas.match(/anula factura folio\s+(.+)/i);
     if (!match) continue;
     const folioRef = match[1].trim();
-    const ref = _facturas.find(r =>
+    const normFolio = f => String(f||'').replace(/\D/g,'');
+    const folioRefNorm = normFolio(folioRef);
+    const ref = folioRefNorm ? (_facturas.find(r =>
       String(r[6]).toUpperCase() !== 'NC' &&
-      String(r[3]).trim() === String(nc[3]).trim() &&   // mismo CUIT
-      String(r[2]).trim().toLowerCase() === folioRef.toLowerCase() &&
+      String(r[3]).trim() === String(nc[3]).trim() &&
+      normFolio(r[2]) === folioRefNorm &&
       String(r[10]).toLowerCase() !== 'anulada'
-    );
+    ) || _facturas.find(r =>
+      String(r[6]).toUpperCase() !== 'NC' &&
+      normFolio(r[2]) === folioRefNorm &&
+      String(r[10]).toLowerCase() !== 'anulada'
+    )) : null;
     if (ref) {
       await sheetsUpdateById('FACTURAS', ref[0], 'K', 'anulada');
       ref[10] = 'anulada';
@@ -1222,7 +1232,28 @@ function calcIVA() {
   document.getElementById('fac-iva-label').textContent = sinIVA ? 'IVA (0% — sin IVA)' : 'IVA (21%)';
   document.getElementById('fac-iva').value = sinIVA ? '0' : (neto * IVA_RATE).toFixed(2);
   document.getElementById('fac-iva').readOnly = sinIVA;
+  const isNC = tipoDoc === 'NC';
+  document.getElementById('fac-nc-ref-group').style.display = isNC ? 'block' : 'none';
+  if (isNC) populateNcRefSelector();
   calcTotal();
+}
+function onNcRefSel(sel) {
+  if (sel.value) document.getElementById('fac-nc-ref').value = sel.value;
+}
+async function populateNcRefSelector() {
+  if (!_facturas.length) _facturas = await sheetsGet('FACTURAS');
+  const cuit = document.getElementById('fac-cuit').value.trim();
+  const tipo = document.getElementById('fac-tipo').value || 'venta';
+  const sel = document.getElementById('fac-nc-ref-sel');
+  if (!sel) return;
+  const candidates = _facturas.filter(r =>
+    String(r[5]).toLowerCase() === tipo &&
+    String(r[6]).toUpperCase() !== 'NC' &&
+    (!cuit || String(r[3]).trim() === cuit) &&
+    String(r[10]).toLowerCase() !== 'anulada'
+  ).sort((a,b) => String(b[1]).localeCompare(String(a[1])));
+  sel.innerHTML = '<option value="">— Seleccioná del listado —</option>' +
+    candidates.map(r => `<option value="${r[2]}">${r[2]} · ${r[4]} · ${d(r[1])} · ${fmtARS(r[9])}</option>`).join('');
 }
 function calcTotal() {
   const neto = Number(document.getElementById('fac-neto').value)||0;
@@ -1410,16 +1441,19 @@ async function saveFactura() {
     await sheetsAppend('FACTURAS', [row]);
     _facturas.push(row);
     if (isNC && ncRef) {
-      const normFolio = f => String(f||'').trim().toLowerCase();
+      // Normaliza a solo dígitos para tolerar formatos "A-0001-001" vs "0001-001"
+      const normFolio = f => String(f||'').replace(/\D/g,'');
       const ncRefNorm = normFolio(ncRef);
-      const ref = _facturas.find(r =>
-        String(r[6]).toUpperCase() !== 'NC' &&
-        normFolio(r[2]) === ncRefNorm &&
-        String(r[3]).trim() === String(cuit).trim()  // mismo CUIT
-      ) || _facturas.find(r =>
-        String(r[6]).toUpperCase() !== 'NC' &&
-        normFolio(r[2]) === ncRefNorm  // fallback sin CUIT
-      );
+      const ref = ncRefNorm ? (
+        _facturas.find(r =>
+          String(r[6]).toUpperCase() !== 'NC' &&
+          normFolio(r[2]) === ncRefNorm &&
+          String(r[3]).trim() === String(cuit).trim()
+        ) || _facturas.find(r =>
+          String(r[6]).toUpperCase() !== 'NC' &&
+          normFolio(r[2]) === ncRefNorm
+        )
+      ) : null;
       if (ref) { await sheetsUpdateById('FACTURAS', ref[0], 'K', 'anulada'); ref[10]='anulada'; toast('Factura '+ref[2]+' marcada como anulada'); }
       else toast('NC guardada — factura referenciada no encontrada en el sistema','warning');
     }
