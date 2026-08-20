@@ -1101,11 +1101,30 @@ async function loadAndRenderFacturas() {
   const tbody = document.getElementById('f-tbody');
   tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px"><div class="spinner" style="margin:auto"></div></td></tr>';
   _facturas = await sheetsGet('FACTURAS');
-  // Migrar NC con estado pendiente → anulada en Sheets
+  // Migrar NC pendientes → anulada
   const ncPendientes = _facturas.filter(r => String(r[6]).toUpperCase() === 'NC' && String(r[10]).toLowerCase() === 'pendiente');
   for (const r of ncPendientes) {
     await sheetsUpdateById('FACTURAS', r[0], 'K', 'anulada');
     r[10] = 'anulada';
+  }
+  // Migrar facturas que deberían estar anuladas por NC:
+  // Busca cada NC, extrae el folio que anula de las notas, y marca esa factura como anulada
+  const todasNC = _facturas.filter(r => String(r[6]).toUpperCase() === 'NC');
+  for (const nc of todasNC) {
+    const notas = String(nc[11]||'');
+    const match = notas.match(/anula factura folio\s+(.+)/i);
+    if (!match) continue;
+    const folioRef = match[1].trim();
+    const ref = _facturas.find(r =>
+      String(r[6]).toUpperCase() !== 'NC' &&
+      String(r[3]).trim() === String(nc[3]).trim() &&   // mismo CUIT
+      String(r[2]).trim().toLowerCase() === folioRef.toLowerCase() &&
+      String(r[10]).toLowerCase() !== 'anulada'
+    );
+    if (ref) {
+      await sheetsUpdateById('FACTURAS', ref[0], 'K', 'anulada');
+      ref[10] = 'anulada';
+    }
   }
   renderFacturas();
 }
@@ -1391,16 +1410,16 @@ async function saveFactura() {
     await sheetsAppend('FACTURAS', [row]);
     _facturas.push(row);
     if (isNC && ncRef) {
-      const normFolio = f => String(f||'').trim().split('-').map(p=>String(parseInt(p,10)||0)).join('-');
+      const normFolio = f => String(f||'').trim().toLowerCase();
       const ncRefNorm = normFolio(ncRef);
-      const ncTipoDoc = String(tipoDoc).toUpperCase();
-      const isFCE_NC = ncTipoDoc.startsWith('FCE');
-      const ref = _facturas.find(r => {
-        const td = String(r[6]).toUpperCase();
-        if (td === 'NC') return false;
-        if (normFolio(r[2]) !== ncRefNorm) return false;
-        return isFCE_NC ? td.startsWith('FCE') : !td.startsWith('FCE');
-      });
+      const ref = _facturas.find(r =>
+        String(r[6]).toUpperCase() !== 'NC' &&
+        normFolio(r[2]) === ncRefNorm &&
+        String(r[3]).trim() === String(cuit).trim()  // mismo CUIT
+      ) || _facturas.find(r =>
+        String(r[6]).toUpperCase() !== 'NC' &&
+        normFolio(r[2]) === ncRefNorm  // fallback sin CUIT
+      );
       if (ref) { await sheetsUpdateById('FACTURAS', ref[0], 'K', 'anulada'); ref[10]='anulada'; toast('Factura '+ref[2]+' marcada como anulada'); }
       else toast('NC guardada — factura referenciada no encontrada en el sistema','warning');
     }
