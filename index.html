@@ -1101,6 +1101,12 @@ async function loadAndRenderFacturas() {
   const tbody = document.getElementById('f-tbody');
   tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px"><div class="spinner" style="margin:auto"></div></td></tr>';
   _facturas = await sheetsGet('FACTURAS');
+  // Migrar NC con estado pendiente → anulada en Sheets
+  const ncPendientes = _facturas.filter(r => String(r[6]).toUpperCase() === 'NC' && String(r[10]).toLowerCase() === 'pendiente');
+  for (const r of ncPendientes) {
+    await sheetsUpdateById('FACTURAS', r[0], 'K', 'anulada');
+    r[10] = 'anulada';
+  }
   renderFacturas();
 }
 function renderFacturas() {
