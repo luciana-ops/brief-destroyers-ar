@@ -1653,18 +1653,22 @@ async function processRetencionFileCobro(file) {
   try {
     const base64 = await fileToBase64(file);
     const mediaType = file.type==='application/pdf'?'application/pdf':file.type;
-    const prompt = `Extraé del certificado de retención en JSON estricto (sin markdown): nro_retencion, tipo_retencion (ganancias/iibb/suss/otro), monto (número). Solo JSON.`;
+    const prompt = `Extraé TODAS las retenciones del documento (puede haber varias páginas o una orden de pago con múltiples retenciones). Respondé en JSON estricto sin markdown, un array: [{nro_retencion, tipo_retencion (ganancias/iibb/iva/suss/otro), monto (número)}]. Incluí cada retención por separado aunque estén en la misma página o en páginas distintas.`;
     const raw = await callClaude(base64, mediaType, prompt);
-    const j = JSON.parse(raw.replace(/```json\n?|\n?```/g,'').trim());
-    addRetCobro();
-    const last = _coRetenciones[_coRetenciones.length-1];
-    last.obj.nro = j.nro_retencion||'';
-    last.obj.tipo = j.tipo_retencion||'otro';
-    last.obj.monto = Number(j.monto)||0;
-    const row = document.getElementById('co-ret-'+last.idx);
-    if (row) { const ins=row.querySelectorAll('input'); ins[0].value=last.obj.nro; ins[1].value=last.obj.tipo; ins[2].value=last.obj.monto||''; }
+    const parsed = JSON.parse(raw.replace(/```json\n?|\n?```/g,'').trim());
+    const items = Array.isArray(parsed) ? parsed : [parsed];
+    for (const j of items) {
+      if (!Number(j.monto)) continue;
+      addRetCobro();
+      const last = _coRetenciones[_coRetenciones.length-1];
+      last.obj.nro = j.nro_retencion||'';
+      last.obj.tipo = j.tipo_retencion||'otro';
+      last.obj.monto = Number(j.monto)||0;
+      const row = document.getElementById('co-ret-'+last.idx);
+      if (row) { const ins=row.querySelectorAll('input'); ins[0].value=last.obj.nro; ins[1].value=last.obj.tipo; ins[2].value=last.obj.monto||''; }
+    }
     updateCoSaldo();
-    toast('Retención leída: '+last.obj.tipo+' '+fmtARS(last.obj.monto));
+    toast(items.length > 1 ? `${items.length} retenciones leídas` : 'Retención leída: '+items[0]?.tipo_retencion+' '+fmtARS(Number(items[0]?.monto||0)));
   } catch(e) { toast('Error leyendo certificado: '+e.message,'error'); }
   finally { loading.style.display='none'; }
 }
