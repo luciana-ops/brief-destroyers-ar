@@ -2462,10 +2462,11 @@ function renderCCClientes() {
   const entries=Object.values(ventasMap).filter(c=>!q||c.razon.toLowerCase().includes(q)||c.cuit.includes(q));
   if(!entries.length){list.innerHTML='<p style="color:var(--muted);padding:20px">Sin resultados</p>';return;}
   list.innerHTML=entries.map(c=>{
-    const totalFac=c.facturas.reduce((s,r)=>s+Number(r[9]||0),0);
-    const totalCob=c.cobros.reduce((s,r)=>s+Number(r[5]||0),0);
-    const totalRet=c.retenciones.reduce((s,r)=>s+Number(r[6]||0),0);
-    const saldo=totalFac-totalCob-totalRet;
+    // Excluye anuladas del totalFac (igual que CC Proveedores)
+    const totalFac=c.facturas.filter(r=>String(r[10]).toLowerCase()!=='anulada').reduce((s,r)=>s+Number(r[9]||0),0);
+    // Suma transfer+cheques del cobro, más las retenciones del JSON interno del cobro (evita doble conteo con hoja RETENCIONES)
+    const totalCob=c.cobros.reduce((s,r)=>s+Number(r[5]||0)+cobroRet(r).reduce((a,x)=>a+Number(x.monto||0),0),0);
+    const saldo=totalFac-totalCob;
     return `<div class="cc-card">
       <div class="cc-card-header" onclick="toggleCC(this)">
         <div><strong>${c.razon}</strong> <span style="color:var(--muted);font-size:12px">${c.cuit}</span></div>
