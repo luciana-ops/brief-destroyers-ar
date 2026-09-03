@@ -86,6 +86,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
 .badge-cobrada,.badge-pagada{background:rgba(16,185,129,.15);color:var(--green)}
 .badge-parcial{background:rgba(59,130,246,.15);color:var(--blue)}
 .badge-anulada{background:rgba(239,68,68,.15);color:var(--red)}
+.badge-anulada_parcial{background:rgba(234,88,12,.15);color:#ea580c}
 .badge-A{background:rgba(139,92,246,.15);color:var(--purple)}
 .badge-B{background:rgba(59,130,246,.15);color:var(--blue)}
 .badge-NC{background:rgba(239,68,68,.15);color:var(--red)}
@@ -255,7 +256,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
       <select id="f-month" onchange="renderFacturas()"><option value="">Todos los meses</option><option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option><option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option><option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option></select>
       <select id="f-tipo" onchange="renderFacturas()"><option value="">Venta + Compra</option><option value="venta">Ventas</option><option value="compra">Compras</option></select>
       <select id="f-tipodoc" onchange="renderFacturas()"><option value="">Todos los doc.</option><option value="A">Factura A</option><option value="B">Factura B</option><option value="C">Factura C</option><option value="FCEA">FCE A</option><option value="FCEB">FCE B</option><option value="FCEC">FCE C</option><option value="NC">Nota de Crédito</option><option value="NDA">Nota de Débito A</option><option value="NDB">Nota de Débito B</option><option value="NDC">Nota de Débito C</option></select>
-      <select id="f-estado" onchange="renderFacturas()"><option value="">Todos los estados</option><option value="pendiente">Pendiente</option><option value="cobrada">Cobrada</option><option value="pagada">Pagada</option><option value="parcial">Parcial</option><option value="anulada">Anulada</option></select>
+      <select id="f-estado" onchange="renderFacturas()"><option value="">Todos los estados</option><option value="pendiente">Pendiente</option><option value="cobrada">Cobrada</option><option value="pagada">Pagada</option><option value="parcial">Parcial</option><option value="anulada">Anulada</option><option value="anulada_parcial">Anulada parcial</option></select>
       <input id="f-cliente" type="text" placeholder="Filtrar por cliente..." oninput="renderFacturas()" style="padding:7px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;width:200px">
       <button class="btn btn-secondary btn-sm" onclick="exportFacturasExcel()"><i class="fa-solid fa-file-excel"></i> Excel</button>
       <button class="btn btn-secondary btn-sm" onclick="exportFacturasPDF()"><i class="fa-solid fa-file-pdf"></i> PDF</button>
@@ -974,7 +975,10 @@ function toast(msg, type='success') {
   setTimeout(() => t.remove(), 3000);
 }
 function badge(text, cls) { return `<span class="badge badge-${cls}">${text}</span>`; }
-function stateBadge(e) { return badge(e, e); }
+function stateBadge(e) {
+  const labels = { anulada_parcial: 'NC parcial' };
+  return badge(labels[e] || e, e);
+}
 function docBadge(d) {
   if(d==='NC') return badge('NC','NC');
   if(d.startsWith('FCE')) return badge('FCE '+d.slice(3),d);
@@ -1156,7 +1160,7 @@ function renderDashboard() {
   _dashCobros.forEach(r => { try { JSON.parse(r[2]).forEach(f => { cobradoPorFolio[f] = (cobradoPorFolio[f]||0) + Number(r[5]||0); }); } catch {} });
   const pagadoPorFolio = {};
   _dashPagos.forEach(r => { try { JSON.parse(r[2]).forEach(f => { pagadoPorFolio[f] = (pagadoPorFolio[f]||0) + Number(r[5]||0); }); } catch {} });
-  const porCobrar = _dashFacturas.filter(r => String(r[5]).toLowerCase()==='venta' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase())).reduce((s,r)=>s+Math.max(0, Number(r[9]||0)-(cobradoPorFolio[String(r[2])]||0)),0);
+  const porCobrar = _dashFacturas.filter(r => String(r[5]).toLowerCase()==='venta' && ['pendiente','parcial','anulada_parcial'].includes(String(r[10]).toLowerCase())).reduce((s,r)=>s+Math.max(0, Number(r[9]||0)-(cobradoPorFolio[String(r[2])]||0)),0);
   const porPagar = _dashFacturas.filter(r => String(r[5]).toLowerCase()==='compra' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase())).reduce((s,r)=>s+Math.max(0, Number(r[9]||0)-(pagadoPorFolio[String(r[2])]||0)),0);
   const cards = [
     {label:'Ventas Netas', val:ventasNeto, cls:'card-green'},
@@ -1201,7 +1205,7 @@ function renderDashboard() {
     }
   } catch(e) { console.warn('Chart error:', e); }
   // Pendientes table
-  const pend = _dashFacturas.filter(r => String(r[5]).toLowerCase()==='venta' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase()));
+  const pend = _dashFacturas.filter(r => String(r[5]).toLowerCase()==='venta' && ['pendiente','parcial','anulada_parcial'].includes(String(r[10]).toLowerCase()));
   const ptbody = document.querySelector('#dash-pendientes tbody');
   ptbody.innerHTML = pend.length ? pend.map(r => { const saldo=Math.max(0,Number(r[9]||0)-(cobradoPorFolio[String(r[2])]||0)); return `<tr><td>${r[2]}</td><td>${r[4]}</td><td>${d(r[1])}</td><td>${fmtARS(saldo)}</td><td>${stateBadge(r[10])}</td></tr>`; }).join('') : '<tr class="empty-row"><td colspan="5">Sin pendientes</td></tr>';
 }
@@ -1232,15 +1236,18 @@ async function loadAndRenderFacturas() {
       String(r[6]).toUpperCase() !== 'NC' &&
       String(r[3]).trim() === String(nc[3]).trim() &&
       normFolio(r[2]) === folioRefNorm &&
-      String(r[10]).toLowerCase() !== 'anulada'
+      !['anulada','anulada_parcial'].includes(String(r[10]).toLowerCase())
     ) || _facturas.find(r =>
       String(r[6]).toUpperCase() !== 'NC' &&
       normFolio(r[2]) === folioRefNorm &&
-      String(r[10]).toLowerCase() !== 'anulada'
+      !['anulada','anulada_parcial'].includes(String(r[10]).toLowerCase())
     )) : null;
     if (ref) {
-      await sheetsUpdateById('FACTURAS', ref[0], 'K', 'anulada');
-      ref[10] = 'anulada';
+      const ncTotal = Math.abs(Number(nc[9]||0));
+      const facTotal = Math.abs(Number(ref[9]||0));
+      const nuevoEstado = ncTotal >= facTotal ? 'anulada' : 'anulada_parcial';
+      await sheetsUpdateById('FACTURAS', ref[0], 'K', nuevoEstado);
+      ref[10] = nuevoEstado;
     }
   }
   renderFacturas();
@@ -1561,8 +1568,16 @@ async function saveFactura() {
           normFolio(r[2]) === ncRefNorm
         )
       ) : null;
-      if (ref) { await sheetsUpdateById('FACTURAS', ref[0], 'K', 'anulada'); ref[10]='anulada'; toast('Factura '+ref[2]+' marcada como anulada'); }
-      else toast('NC guardada — factura referenciada no encontrada en el sistema','warning');
+      if (ref) {
+        const ncTotal = Math.abs(total);
+        const facTotal = Math.abs(Number(ref[9]||0));
+        const nuevoEstado = ncTotal >= facTotal ? 'anulada' : 'anulada_parcial';
+        await sheetsUpdateById('FACTURAS', ref[0], 'K', nuevoEstado);
+        ref[10] = nuevoEstado;
+        toast(nuevoEstado === 'anulada'
+          ? 'Factura '+ref[2]+' marcada como anulada'
+          : 'Factura '+ref[2]+' marcada como NC parcial (saldo pendiente)');
+      } else toast('NC guardada — factura referenciada no encontrada en el sistema','warning');
     }
     autoRegistrarContacto(cuit, razon, tipo);
     renderFacturas();
@@ -1655,7 +1670,7 @@ function populateFacturasSelect(selId, tipo) {
   sel.innerHTML = '<option value="">Seleccioná factura...</option>' + opts.map(r => `<option value="${r[2]}" data-id="${r[0]}" data-cuit="${r[3]}" data-razon="${r[4]}" data-total="${r[9]}">${r[2]} · ${r[4]} · ${fmtARS(r[9])}</option>`).join('');
 }
 function populateCoClientes() {
-  const pendientes = _facturas.filter(r => String(r[5]).toLowerCase()==='venta' && ['pendiente','parcial'].includes(String(r[10]).toLowerCase()));
+  const pendientes = _facturas.filter(r => String(r[5]).toLowerCase()==='venta' && ['pendiente','parcial','anulada_parcial'].includes(String(r[10]).toLowerCase()));
   const clientes = [...new Map(pendientes.map(r => [r[4], {razon:r[4], cuit:r[3]}])).values()].sort((a,b)=>a.razon.localeCompare(b.razon));
   const sel = document.getElementById('co-cliente');
   sel.innerHTML = '<option value="">— Seleccioná cliente —</option>' + clientes.map(c=>`<option value="${c.cuit}" data-razon="${c.razon}">${c.razon}</option>`).join('');
@@ -1670,7 +1685,7 @@ function filtrarFacturasPorCliente() {
   if (!cuit) { group.style.display='none'; updateCoSaldo(); return; }
   const opts = _facturas
     .filter(r => String(r[5]).toLowerCase()==='venta'
-      && ['pendiente','parcial'].includes(String(r[10]).toLowerCase())
+      && ['pendiente','parcial','anulada_parcial'].includes(String(r[10]).toLowerCase())
       && String(r[3]).trim()===String(cuit).trim())
     .sort((a,b) => String(a[1]).localeCompare(String(b[1])));  // orden cronológico
   const list = document.getElementById('co-facturas-list');
