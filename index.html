@@ -2046,6 +2046,7 @@ async function saveFactura() {
     try {
       await Promise.all(cols.map((c,i)=>sheetsUpdateById('FACTURAS',_facturaEditId,c,vals[i])));
       if (fac) { vals.forEach((v,i)=>fac[i+1]=v); }
+      saveLSSnapshot();
       renderFacturas(); closeModal('modal-factura'); toast('Factura actualizada');
     } catch(e) { toast('Error: '+e.message,'error'); btn.disabled=false; }
     return;
@@ -2084,6 +2085,7 @@ async function saveFactura() {
       } else toast('NC guardada — factura referenciada no encontrada en el sistema','warning');
     }
     autoRegistrarContacto(cuit, razon, tipo);
+    saveLSSnapshot();
     renderFacturas();
     closeModal('modal-factura');
     toast('Factura guardada');
@@ -2111,6 +2113,7 @@ async function saveTag() {
     ]);
     const fac = _facturas.find(r=>r[0]===_tagFacturaId);
     if (fac) { fac[20]=rubro; fac[21]=cat; }
+    saveLSSnapshot();
     renderFacturas();
     closeModal('modal-tag');
     toast('Rubro asignado');
