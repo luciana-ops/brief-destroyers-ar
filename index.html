@@ -576,6 +576,37 @@ tr:hover td{background:rgba(255,255,255,.03)}
 <!-- MODALS -->
 <div id="modal-overlay" class="modal-overlay" style="display:none" onclick="closeModalOnOverlay(event)">
 
+  <!-- MODAL TAG RUBRO -->
+  <div id="modal-tag" class="modal" style="display:none">
+    <div class="modal-header"><h3><i class="fa-solid fa-tag"></i> Asignar Rubro</h3><button class="modal-close" onclick="closeModal('modal-tag')">×</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Rubro</label>
+        <select id="tag-rubro" onchange="document.getElementById('tag-cat-group').style.display=this.value==='estructura'?'block':'none'">
+          <option value="">— Sin asignar —</option>
+          <option value="estructura">Estructura</option>
+        </select>
+      </div>
+      <div class="form-group" id="tag-cat-group" style="display:none"><label>Categoría</label>
+        <select id="tag-cat">
+          <option value="honorarios">Honorarios</option>
+          <option value="servicios_ext">Servicios externos</option>
+          <option value="comisiones">Comisiones</option>
+          <option value="sueldos">Sueldos y Jornales</option>
+          <option value="alquiler">Alquiler</option>
+          <option value="seguros">Seguros y Pólizas</option>
+          <option value="transporte">Transporte</option>
+          <option value="alimentación">Alimentación</option>
+          <option value="papelería">Papelería</option>
+          <option value="otros">Otros</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-tag')">Cancelar</button>
+      <button id="tag-save-btn" class="btn btn-primary" onclick="saveTag()">Guardar</button>
+    </div>
+  </div>
+
   <!-- MODAL FACTURA -->
   <div id="modal-factura" class="modal" style="display:none">
     <div class="modal-header"><h3>Nueva Factura</h3><button class="modal-close" onclick="closeModal('modal-factura')">×</button></div>
@@ -1664,7 +1695,7 @@ function renderFacturas() {
       <td>${docBadge(String(r[6]).toUpperCase())}</td>
       <td>${badge(String(r[5]).toLowerCase()==='venta'?'Venta':'Compra', String(r[5]).toLowerCase())}</td>
       <td>${r[4]}${String(r[5]).toLowerCase()==='venta'&&!CLIENTES_CONOCIDOS.some(c=>String(r[4]).toUpperCase().includes(c))?'<br><span class="badge badge-otros">OTROS</span>':''}<br><small style="color:var(--muted)">${r[3]}</small></td>
-      <td style="font-size:12px;color:var(--muted)">${isNCrow?`<span style="color:#e53e3e">${r[11]||''}</span>`:(r[13]||'')}</td>
+      <td style="font-size:12px;color:var(--muted)">${isNCrow?`<span style="color:#e53e3e">${r[11]||''}</span>`:(r[13]||'')}${r[20]==='estructura'?`<br><span class="badge" style="background:rgba(139,92,246,.15);color:#8b5cf6;font-size:10px">${GASTO_CATS[r[21]]||r[21]||'Estructura'}</span>`:''}</td>
       <td style="font-size:12px;color:var(--muted)">${r[12]||''}</td>
       <td${red}>${fmtARS(r[7])}</td>
       <td${red}>${fmtARS(r[8])}</td>
@@ -1672,6 +1703,7 @@ function renderFacturas() {
       <td>${stateBadge(String(r[10]).toLowerCase())}</td>
       <td>
         <button class="btn btn-secondary btn-sm" onclick='showDetalleFactura(${JSON.stringify(r)})'><i class="fa-solid fa-eye"></i></button>
+        ${String(r[5]).toLowerCase()==='compra'?`<button class="btn btn-secondary btn-sm" title="Asignar rubro" onclick="openTagModal('${r[0]}')"><i class="fa-solid fa-tag"></i></button>`:''}
         <button class="btn btn-secondary btn-sm" onclick="editFactura('${r[0]}')"><i class="fa-solid fa-pen"></i></button>
         ${currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteFactura('${r[0]}')"><i class="fa-solid fa-trash"></i></button>`:''}
       </td>
@@ -2056,6 +2088,33 @@ async function saveFactura() {
     closeModal('modal-factura');
     toast('Factura guardada');
   } catch(e) { toast('Error guardando: ' + e.message, 'error'); btn.disabled = false; }
+}
+let _tagFacturaId = null;
+function openTagModal(id) {
+  const r = _facturas.find(x=>x[0]===id); if(!r) return;
+  _tagFacturaId = id;
+  document.getElementById('tag-rubro').value = r[20]||'';
+  const hasCat = (r[20]||'') === 'estructura';
+  document.getElementById('tag-cat-group').style.display = hasCat ? 'block' : 'none';
+  if (hasCat) document.getElementById('tag-cat').value = r[21]||'honorarios';
+  document.getElementById('tag-save-btn').disabled = false;
+  openModal('modal-tag');
+}
+async function saveTag() {
+  const btn = document.getElementById('tag-save-btn'); btn.disabled = true;
+  const rubro = document.getElementById('tag-rubro').value;
+  const cat = rubro === 'estructura' ? document.getElementById('tag-cat').value : '';
+  try {
+    await Promise.all([
+      sheetsUpdateById('FACTURAS', _tagFacturaId, 'U', rubro),
+      sheetsUpdateById('FACTURAS', _tagFacturaId, 'V', cat)
+    ]);
+    const fac = _facturas.find(r=>r[0]===_tagFacturaId);
+    if (fac) { fac[20]=rubro; fac[21]=cat; }
+    renderFacturas();
+    closeModal('modal-tag');
+    toast('Rubro asignado');
+  } catch(e) { toast('Error: '+e.message,'error'); btn.disabled=false; }
 }
 function autoRegistrarContacto(cuit, razon, tipoFac) {
   if (!cuit || !razon) return;
