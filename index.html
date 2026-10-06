@@ -1167,7 +1167,7 @@ function getFilter(id) { const e = document.getElementById(id); return e ? e.val
 // ─── SHEETS API ──────────────────────────────────────────────────
 // ─── CACHE ───────────────────────────────────────────────────────
 const _sheetsCache = {};
-const CACHE_TTL = 4 * 60 * 1000; // 4 minutos
+const CACHE_TTL = 15 * 60 * 1000; // 15 minutos
 const BRIEF_LS_KEY = 'brief_data_v3';
 const BRIEF_LS_TTL = 25 * 60 * 1000; // 25 minutos en localStorage
 
@@ -1212,12 +1212,10 @@ async function sheetsGet(sheetName) {
   }
 }
 async function sheetsAppend(sheetName, rows) {
-  sheetsInvalidate(sheetName);
   await fetch('/api/sheets', { method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ sheetId: SHEET_ID, sheetName, action:'append', values: rows }) });
 }
 async function sheetsUpdateById(sheetName, id, col, value) {
-  sheetsInvalidate(sheetName);
   await fetch('/api/sheets', { method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ sheetId: SHEET_ID, sheetName, action:'updateById', id, col, value }) });
 }
