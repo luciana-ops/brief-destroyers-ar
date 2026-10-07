@@ -513,7 +513,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
 
 <!-- MODAL REGISTRAR PAGO AFIP -->
 <div class="modal-overlay" id="modal-pago-afip" style="display:none">
-  <div class="modal" style="max-width:420px">
+  <div class="modal-pago-afip-box" style="max-width:420px;background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;box-shadow:0 12px 32px rgba(0,0,0,.25)">
     <div class="modal-header"><h3 id="pago-afip-title">Registrar pago de cuota</h3><button class="modal-close" onclick="document.getElementById('modal-pago-afip').style.display='none'">×</button></div>
     <div class="modal-body">
       <div style="background:var(--bg-2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px" id="pago-afip-info"></div>
@@ -4533,12 +4533,20 @@ async function savePlanAfip() {
     ]).catch(e=>toast('Error al sincronizar con Google: '+e.message,'error'));
   } else {
     const row = ['AP'+Date.now(), fecha, nro, concepto, cuotasJSON, notas];
-    _planesAfip.push(row);
-    saveLSSnapshot();
-    renderPlanesAfip();
-    if (document.getElementById('section-planes-afip')?.classList.contains('active')) renderPlanesAfipTab();
-    closeModal('modal-plan-afip'); toast('Plan AFIP guardado');
-    sheetsAppend('PLANES_AFIP', [row]).catch(e=>toast('Error al sincronizar con Google: '+e.message,'error'));
+    const saveBtn = document.querySelector('#modal-plan-afip .btn-primary');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Guardando...'; }
+    try {
+      await sheetsAppend('PLANES_AFIP', [row]);
+      _planesAfip.push(row);
+      saveLSSnapshot();
+      renderPlanesAfip();
+      if (document.getElementById('section-planes-afip')?.classList.contains('active')) renderPlanesAfipTab();
+      closeModal('modal-plan-afip');
+      toast('Plan AFIP guardado');
+    } catch(e) {
+      toast('Error guardando plan: '+e.message, 'error');
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Guardar plan'; }
+    }
   }
 }
 
