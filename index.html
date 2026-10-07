@@ -4166,7 +4166,7 @@ function editServicio(id) { openServicioModal(id); }
 async function saveServicio() {
   const id = document.getElementById('srv-edit-id').value;
   const row = [
-    id || uid(),
+    id || 'SV'+Date.now(),
     document.getElementById('srv-fecha').value,
     document.getElementById('srv-vencimiento').value,
     document.getElementById('srv-proveedor').value.trim(),
@@ -4532,7 +4532,7 @@ async function savePlanAfip() {
       sheetsUpdateById('PLANES_AFIP', id, 'F', notas)
     ]).catch(e=>toast('Error al sincronizar con Google: '+e.message,'error'));
   } else {
-    const row = [uid(), fecha, nro, concepto, cuotasJSON, notas];
+    const row = ['AP'+Date.now(), fecha, nro, concepto, cuotasJSON, notas];
     _planesAfip.push(row);
     saveLSSnapshot();
     renderPlanesAfip();
