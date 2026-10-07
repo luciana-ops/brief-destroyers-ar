@@ -214,7 +214,6 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="nav-item" onclick="navigate('cc-proveedores')"><i class="fa-solid fa-truck"></i> CC Proveedores</div>
     <div class="nav-item" onclick="navigate('gastos')"><i class="fa-solid fa-receipt"></i> Estructura</div>
     <div class="nav-item" onclick="navigate('rentabilidad')"><i class="fa-solid fa-chart-line"></i> Rentabilidad</div>
-    <div class="nav-item" onclick="navigate('servicios')"><i class="fa-solid fa-bolt"></i> Servicios</div>
     <div class="nav-item" onclick="navigate('extracto')"><i class="fa-solid fa-building-columns"></i> Extracto</div>
     <div class="nav-item" onclick="navigate('caja')"><i class="fa-solid fa-cash-register"></i> Caja</div>
     <div class="nav-item" onclick="navigate('maestro')"><i class="fa-solid fa-address-book"></i> Maestro</div>
@@ -290,9 +289,14 @@ tr:hover td{background:rgba(255,255,255,.03)}
       <button class="btn btn-secondary btn-sm" onclick="openResumenModal()" title="Resumen de ventas netas totalizadas por mes"><i class="fa-solid fa-chart-bar"></i> Resumen ventas netas</button>
     </div>
     <div class="totals-bar" id="f-totals"></div>
+    <div id="f-batch-bar" style="display:none;padding:10px 0;display:none;align-items:center;gap:12px;position:sticky;top:0;z-index:10;background:var(--surface);border-bottom:1px solid var(--border)">
+      <span id="f-batch-count" style="font-size:13px;font-weight:500"></span>
+      <button class="btn btn-primary btn-sm" onclick="openBatchTagModal()"><i class="fa-solid fa-tags"></i> Tagear seleccionadas</button>
+      <button class="btn btn-secondary btn-sm" onclick="clearComprasSelection()">Limpiar selección</button>
+    </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Fecha</th><th>Folio</th><th>Doc</th><th>Tipo</th><th>Cliente/Proveedor</th><th>Concepto</th><th>OC</th><th>Neto</th><th>IVA</th><th>Total</th><th>Estado</th><th></th></tr></thead>
+        <thead><tr><th><input type="checkbox" id="f-check-all" onclick="toggleAllComprasCheck(this)" title="Seleccionar todas las compras"></th><th>Fecha</th><th>Folio</th><th>Doc</th><th>Tipo</th><th>Cliente/Proveedor</th><th>Concepto</th><th>OC</th><th>Neto</th><th>IVA</th><th>Total</th><th>Estado</th><th></th></tr></thead>
         <tbody id="f-tbody"></tbody>
       </table>
     </div>
@@ -630,13 +634,49 @@ tr:hover td{background:rgba(255,255,255,.03)}
         </select>
       </div>
       <div class="form-group" id="tag-proyecto-group" style="display:none"><label>Cliente / Proyecto</label>
-        <input id="tag-proyecto" list="tag-proyecto-list" placeholder="Nombre del cliente...">
+        <input id="tag-proyecto" list="tag-proyecto-list" placeholder="Nombre del cliente..." oninput="populateTagVentasSelect()">
         <datalist id="tag-proyecto-list"></datalist>
+        <div id="tag-venta-ref-group" style="display:none;margin-top:6px">
+          <label style="font-size:12px;color:var(--muted)">Factura de venta asociada (opcional)</label>
+          <select id="tag-venta-ref"></select>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-tag')">Cancelar</button>
       <button id="tag-save-btn" class="btn btn-primary" onclick="saveTag()">Guardar</button>
+    </div>
+  </div>
+
+  <!-- MODAL BATCH TAG -->
+  <div id="modal-batch-tag" class="modal" style="display:none;max-width:440px">
+    <div class="modal-header"><h3><i class="fa-solid fa-tags"></i> Tagear compras seleccionadas</h3><button class="modal-close" onclick="closeModal('modal-batch-tag')">×</button></div>
+    <div class="modal-body">
+      <p id="batch-tag-desc" style="font-size:13px;color:var(--muted);margin-bottom:16px"></p>
+      <div class="form-group"><label>Rubro</label>
+        <select id="batch-rubro" onchange="toggleBatchRubro()">
+          <option value="">— Sin asignar —</option>
+          <option value="estructura">Estructura</option>
+          <option value="proyecto">Proyecto / Cliente</option>
+        </select>
+      </div>
+      <div class="form-group" id="batch-cat-group" style="display:none"><label>Categoría Estructura</label>
+        <select id="batch-cat">
+          <option value="honorarios">Honorarios</option><option value="servicios_ext">Servicios externos</option>
+          <option value="comisiones">Comisiones</option><option value="sueldos">Sueldos y Jornales</option>
+          <option value="alquiler">Alquiler</option><option value="seguros">Seguros y Pólizas</option>
+          <option value="transporte">Transporte</option><option value="alimentación">Alimentación</option>
+          <option value="papelería">Papelería</option><option value="otros">Otros</option>
+        </select>
+      </div>
+      <div class="form-group" id="batch-proyecto-group" style="display:none"><label>Cliente / Proyecto</label>
+        <input id="batch-proyecto" list="batch-proyecto-list" placeholder="Nombre del cliente...">
+        <datalist id="batch-proyecto-list"></datalist>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-batch-tag')">Cancelar</button>
+      <button id="batch-save-btn" class="btn btn-primary" onclick="saveBatchTag()">Guardar todos</button>
     </div>
   </div>
 
@@ -749,8 +789,12 @@ tr:hover td{background:rgba(255,255,255,.03)}
           </div>
           <div class="form-group" id="fac-proyecto-group" style="flex:1;display:none">
             <label>Cliente / Proyecto</label>
-            <input id="fac-proyecto" list="fac-proyecto-list" placeholder="Nombre del cliente...">
+            <input id="fac-proyecto" list="fac-proyecto-list" placeholder="Nombre del cliente..." oninput="populateVentasSelect()">
             <datalist id="fac-proyecto-list"></datalist>
+            <div id="fac-venta-ref-group" style="display:none;margin-top:6px">
+              <label style="font-size:12px;color:var(--muted)">Factura de venta asociada (opcional)</label>
+              <select id="fac-venta-ref"></select>
+            </div>
           </div>
         </div>
         <div id="fac-nc-ref-group" class="form-group" style="display:none">
@@ -1030,8 +1074,8 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="modal-header"><h3>Nuevo Gasto</h3><button class="modal-close" onclick="closeModal('modal-gasto')">×</button></div>
     <div class="modal-body">
       <div class="form-row">
-        <div class="form-group"><label>Fecha</label><input id="ga-fecha" type="date"></div>
-        <div class="form-group"><label>Monto</label><input id="ga-monto" type="number" step="0.01"></div>
+        <div class="form-group" style="flex:1"><label>Período <span style="font-size:11px;color:var(--muted)">(mes al que corresponde)</span></label><input id="ga-periodo" type="month"></div>
+        <div class="form-group" style="flex:1"><label>Monto</label><input id="ga-monto" type="number" step="0.01"></div>
       </div>
       <div class="form-group"><label>Descripción</label><input id="ga-desc" type="text"></div>
       <div class="form-row">
@@ -1041,6 +1085,10 @@ tr:hover td{background:rgba(255,255,255,.03)}
         <div class="form-group"><label>Quién</label>
           <select id="ga-quien"><option value="Fiamma">Fiamma</option><option value="Lu">Lu</option><option value="Otro">Otro</option></select>
         </div>
+      </div>
+      <div class="form-group"><label>Proyecto / Cliente <span style="font-size:11px;color:var(--muted)">(opcional)</span></label>
+        <input id="ga-proyecto" list="ga-proyecto-list" placeholder="Nombre del cliente si aplica...">
+        <datalist id="ga-proyecto-list"></datalist>
       </div>
       <div class="form-group"><label>Medio de pago</label>
         <select id="ga-medio"><option value="efectivo">Efectivo / Caja</option><option value="transferencia">Transferencia</option><option value="tarjeta">Tarjeta</option><option value="otro">Otro</option></select>
@@ -1645,6 +1693,7 @@ function renderDashboard() {
 // ─── FACTURAS ────────────────────────────────────────────────────
 let _facturas = [];
 async function loadAndRenderFacturas() {
+  if (_facturas.length) { renderFacturas(); return; }
   const tbody = document.getElementById('f-tbody');
   tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px"><div class="spinner" style="margin:auto"></div></td></tr>';
   _facturas = await sheetsGet('FACTURAS');
@@ -1728,6 +1777,7 @@ function renderFacturas() {
     const red = isNCrow ? ' style="color:#e53e3e"' : '';
     return `
     <tr${isNCrow ? ' style="background:rgba(229,62,62,0.05)"' : ''}>
+      <td>${String(r[5]).toLowerCase()==='compra'?`<input type="checkbox" class="compra-check" data-id="${r[0]}" onchange="updateBatchBar()">`:'&nbsp;'}</td>
       <td>${d(r[1])}</td>
       <td><strong${red}>${r[2]}</strong></td>
       <td>${docBadge(String(r[6]).toUpperCase())}</td>
@@ -1915,6 +1965,17 @@ function populateProyectoDatalist(dlId){
   _facturas.filter(r=>String(r[5]).toLowerCase()==='venta').forEach(r=>nombres.add(String(r[4]).trim()));
   [...nombres].filter(Boolean).sort().forEach(n=>{const o=document.createElement('option');o.value=n;dl.appendChild(o);});
 }
+function _fillVentasSelect(selId, groupId, clienteVal) {
+  const grp=document.getElementById(groupId); if(!grp) return;
+  const nombre=(clienteVal||'').trim().toLowerCase();
+  const opts=_facturas.filter(r=>String(r[5]).toLowerCase()==='venta'&&String(r[6]).toUpperCase()!=='NC'&&String(r[4]).trim().toLowerCase()===nombre);
+  if(!opts.length){grp.style.display='none';return;}
+  grp.style.display='block';
+  const sel=document.getElementById(selId);
+  sel.innerHTML='<option value="">— Sin asociar —</option>'+opts.sort((a,b)=>String(b[1]).localeCompare(String(a[1]))).map(r=>`<option value="${r[0]}">${String(r[1]||'').substring(0,10)} · ${r[2]} · ${fmtARS(r[9])}</option>`).join('');
+}
+function populateVentasSelect(){_fillVentasSelect('fac-venta-ref','fac-venta-ref-group',document.getElementById('fac-proyecto').value);}
+function populateTagVentasSelect(){_fillVentasSelect('tag-venta-ref','tag-venta-ref-group',document.getElementById('tag-proyecto').value);}
 function editFactura(id) {
   const r = _facturas.find(x=>x[0]===id); if (!r) return;
   _facturaEditId = id;
@@ -1926,7 +1987,7 @@ function editFactura(id) {
   document.getElementById('fac-ai-info').style.display='none';
   document.getElementById('fac-dup-warning').style.display='none';
   document.getElementById('fac-folio').value=r[2]||'';
-  document.getElementById('fac-fecha').value=r[1]||'';
+  document.getElementById('fac-fecha').value=String(r[1]||'').substring(0,10);
   document.getElementById('fac-cuit').value=r[3]||'';
   document.getElementById('fac-razon').value=r[4]||'';
   document.getElementById('fac-tipo').value=r[5]||'venta';
@@ -2183,6 +2244,56 @@ async function saveTag() {
     closeModal('modal-tag');
     toast('Rubro asignado');
   } catch(e) { toast('Error: '+e.message,'error'); btn.disabled=false; }
+}
+function updateBatchBar(){
+  const checks=[...document.querySelectorAll('.compra-check:checked')];
+  const bar=document.getElementById('f-batch-bar');
+  bar.style.display=checks.length?'flex':'none';
+  document.getElementById('f-batch-count').textContent=`${checks.length} compra${checks.length!==1?'s':''} seleccionada${checks.length!==1?'s':''}`;
+}
+function toggleAllComprasCheck(el){
+  document.querySelectorAll('.compra-check').forEach(c=>c.checked=el.checked);
+  updateBatchBar();
+}
+function clearComprasSelection(){
+  document.querySelectorAll('.compra-check').forEach(c=>c.checked=false);
+  const all=document.getElementById('f-check-all'); if(all) all.checked=false;
+  updateBatchBar();
+}
+function toggleBatchRubro(){
+  const v=document.getElementById('batch-rubro').value;
+  document.getElementById('batch-cat-group').style.display=v==='estructura'?'block':'none';
+  document.getElementById('batch-proyecto-group').style.display=v==='proyecto'?'block':'none';
+  if(v==='proyecto') populateProyectoDatalist('batch-proyecto-list');
+}
+function openBatchTagModal(){
+  const ids=[...document.querySelectorAll('.compra-check:checked')].map(c=>c.dataset.id);
+  if(!ids.length) return;
+  document.getElementById('batch-tag-desc').textContent=`Se asignará el mismo rubro a ${ids.length} factura${ids.length!==1?'s':''} de compra.`;
+  document.getElementById('batch-rubro').value='';
+  document.getElementById('batch-cat-group').style.display='none';
+  document.getElementById('batch-proyecto-group').style.display='none';
+  document.getElementById('batch-save-btn').disabled=false;
+  openModal('modal-batch-tag');
+}
+async function saveBatchTag(){
+  const btn=document.getElementById('batch-save-btn'); btn.disabled=true;
+  const rubro=document.getElementById('batch-rubro').value;
+  const cat=rubro==='estructura'?document.getElementById('batch-cat').value
+            :rubro==='proyecto'?document.getElementById('batch-proyecto').value:'';
+  const ids=[...document.querySelectorAll('.compra-check:checked')].map(c=>c.dataset.id);
+  try {
+    await Promise.all(ids.flatMap(id=>[
+      sheetsUpdateById('FACTURAS',id,'U',rubro),
+      sheetsUpdateById('FACTURAS',id,'V',cat)
+    ]));
+    ids.forEach(id=>{const f=_facturas.find(r=>r[0]===id);if(f){f[20]=rubro;f[21]=cat;}});
+    saveLSSnapshot();
+    clearComprasSelection();
+    renderFacturas();
+    closeModal('modal-batch-tag');
+    toast(`Rubro asignado a ${ids.length} factura${ids.length!==1?'s':''}`);
+  } catch(e){toast('Error: '+e.message,'error');btn.disabled=false;}
 }
 function autoRegistrarContacto(cuit, razon, tipoFac) {
   if (!cuit || !razon) return;
@@ -2469,6 +2580,7 @@ function totalCobradoFolio(folio, cuit, minFecha) {
   }, 0);
 }
 async function loadAndRenderCobros() {
+  if (_cobros.length && _facturas.length) { renderCobros(); return; }
   _cobros = await sheetsGet('COBROS');
   if (!_facturas.length) _facturas = await sheetsGet('FACTURAS');
   renderCobros();
@@ -2898,6 +3010,7 @@ function descargarReciboCobro(idx) {
 let _pagos = [];
 function pagoFolios(r) { try { const v=JSON.parse(r[2]); return Array.isArray(v)?v:[String(r[2])]; } catch { return r[2]?[r[2]]:[]; } }
 async function loadAndRenderPagos() {
+  if (_pagos.length && _facturas.length) { renderPagos(); return; }
   _pagos = await sheetsGet('PAGOS');
   if (!_facturas.length) _facturas = await sheetsGet('FACTURAS');
   renderPagos();
@@ -3210,6 +3323,7 @@ function toggleRetView() {
   renderRetenciones();
 }
 async function loadAndRenderRetenciones() {
+  if (_retenciones.length) { renderRetenciones(); return; }
   _retenciones = await sheetsGet('RETENCIONES');
   renderRetenciones();
 }
@@ -3315,6 +3429,7 @@ function exportRetencionesExcel() {
 // ─── CHEQUES ─────────────────────────────────────────────────────
 let _chequesRec=[], _chequesEmi=[];
 async function loadAndRenderCheques() {
+  if (_chequesRec.length && _chequesEmi.length) { renderChequesRecibidos(); return; }
   _chequesRec=await sheetsGet('CHEQUES_RECIBIDOS');
   _chequesEmi=await sheetsGet('CHEQUES_EMITIDOS');
   renderChequesRecibidos();
@@ -3362,6 +3477,7 @@ async function deleteChequeEmi(id) {
 
 // ─── CC CLIENTES ─────────────────────────────────────────────────
 async function loadAndRenderCCClientes() {
+  if (_facturas.length && _cobros.length && _retenciones.length) { renderCCClientes(); return; }
   [_facturas,_cobros,_retenciones]=await Promise.all([sheetsGet('FACTURAS'),sheetsGet('COBROS'),sheetsGet('RETENCIONES')]);
   renderCCClientes();
 }
@@ -3417,6 +3533,7 @@ function toggleCC(header) { header.nextElementSibling.classList.toggle('open'); 
 
 // ─── CC PROVEEDORES ───────────────────────────────────────────────
 async function loadAndRenderCCProveedores() {
+  if (_facturas.length && _pagos.length && _chequesEmi.length) { renderCCProveedores(); return; }
   [_facturas,_pagos,_chequesEmi]=await Promise.all([sheetsGet('FACTURAS'),sheetsGet('PAGOS'),sheetsGet('CHEQUES_EMITIDOS')]);
   renderCCProveedores();
 }
@@ -3472,6 +3589,7 @@ function renderCCProveedores() {
 // ─── MAESTRO ─────────────────────────────────────────────────────
 let _maestro = [];
 async function loadAndRenderMaestro() {
+  if (_maestro.length) { renderMaestro('cliente'); renderMaestro('proveedor'); return; }
   _maestro = await sheetsGet('MAESTRO');
   renderMaestro('cliente');
   renderMaestro('proveedor');
@@ -3585,7 +3703,9 @@ async function deleteMaestro(id) {
 // ─── GASTOS ──────────────────────────────────────────────────────
 let _gastos=[];
 async function loadAndRenderGastos() {
+  if (_gastos.length && _facturas.length) { renderGastos(); return; }
   _gastos=await sheetsGet('GASTOS');
+  if (!_facturas.length) _facturas = await sheetsGet('FACTURAS');
   renderGastos();
 }
 
@@ -3629,6 +3749,12 @@ function renderRentabilidad() {
     const key = String(r[21]||'—').trim();
     if (!clienteMap[key]) clienteMap[key] = { ventas: 0, costos: 0 };
     clienteMap[key].costos += Math.abs(Number(r[7]||0));
+  });
+  // Gastos manuales con proyecto asignado
+  getProyectoGastos().filter(g => String(g.fecha||'').startsWith(prefix)).forEach(g => {
+    const key = String(g.proyecto||'—').trim();
+    if (!clienteMap[key]) clienteMap[key] = { ventas: 0, costos: 0 };
+    clienteMap[key].costos += g.monto;
   });
 
   const rows = Object.entries(clienteMap).sort((a,b)=>b[1].ventas-a[1].ventas);
@@ -3675,9 +3801,14 @@ const GASTO_CATS = {
   'servicios':'Servicios','otros':'Otros'
 };
 function getEstructuraCombined() {
-  const fromGastos = _gastos.map(r=>({id:r[0],fecha:r[1],desc:r[2],cat:r[3],monto:Number(r[4]||0),source:'gasto',deleteId:r[0]}));
-  const fromFacturas = _facturas.filter(r=>String(r[5]).toLowerCase()==='compra'&&String(r[20]).toLowerCase()==='estructura').map(r=>({id:r[0],fecha:r[1],desc:r[4]+(r[13]?' — '+r[13]:''),cat:r[21]||'otros',monto:Math.abs(Number(r[7]||0)),source:'factura',deleteId:null}));
+  // Gastos without a project = pure structure costs
+  const fromGastos = _gastos.filter(r=>!r[8]).map(r=>({id:r[0],fecha:r[1],desc:r[2],cat:r[3],monto:Number(r[4]||0),source:'gasto',deleteId:r[0],proyecto:''}));
+  const fromFacturas = _facturas.filter(r=>String(r[5]).toLowerCase()==='compra'&&String(r[20]).toLowerCase()==='estructura').map(r=>({id:r[0],fecha:r[1],desc:r[4]+(r[13]?' — '+r[13]:''),cat:r[21]||'otros',monto:Math.abs(Number(r[7]||0)),source:'factura',deleteId:null,proyecto:''}));
   return [...fromGastos,...fromFacturas].sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));
+}
+function getProyectoGastos() {
+  // Gastos with a project name assigned = go to rentabilidad
+  return _gastos.filter(r=>r[8]).map(r=>({id:r[0],fecha:r[1],desc:r[2],cat:r[3],monto:Number(r[4]||0),source:'gasto',deleteId:r[0],proyecto:r[8]||''}));
 }
 function renderGastos() {
   const year=getFilter('g-year'),month=getFilter('g-month'),cat=getFilter('g-cat');
@@ -3707,18 +3838,23 @@ async function deleteGasto(id) {
   await sheetsDelete('GASTOS',id);_gastos=_gastos.filter(r=>r[0]!==id);renderGastos();toast('Gasto eliminado');
 }
 function openGastoModal() {
-  document.getElementById('ga-fecha').value=today();
-  ['ga-monto','ga-desc','ga-notas'].forEach(id=>document.getElementById(id).value='');
+  const now=new Date(); document.getElementById('ga-periodo').value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  ['ga-monto','ga-desc','ga-notas','ga-proyecto'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('ga-medio').value='efectivo';
   document.getElementById('ga-save-btn').disabled=false;
+  populateProyectoDatalist('ga-proyecto-list');
   openModal('modal-gasto');
 }
 async function saveGasto() {
   const btn=document.getElementById('ga-save-btn');btn.disabled=true;
   const id='G'+Date.now();
-  const row=[id,document.getElementById('ga-fecha').value,document.getElementById('ga-desc').value,document.getElementById('ga-cat').value,Number(document.getElementById('ga-monto').value)||0,document.getElementById('ga-quien').value,document.getElementById('ga-notas').value,document.getElementById('ga-medio').value];
+  const periodo=document.getElementById('ga-periodo').value||today().substring(0,7);
+  const fecha=periodo+'-01';
+  const proyecto=document.getElementById('ga-proyecto')?.value||'';
+  const row=[id,fecha,document.getElementById('ga-desc').value,document.getElementById('ga-cat').value,Number(document.getElementById('ga-monto').value)||0,document.getElementById('ga-quien').value,document.getElementById('ga-notas').value,document.getElementById('ga-medio').value,proyecto];
   try {
     await sheetsAppend('GASTOS',[row]);_gastos.push(row);
+    saveLSSnapshot();
     renderGastos();closeModal('modal-gasto');toast('Gasto guardado');
   } catch(e){toast('Error: '+e.message,'error');btn.disabled=false;}
 }
@@ -3730,6 +3866,7 @@ function exportGastosExcel() {
 // ─── CAJA ────────────────────────────────────────────────────────
 let _caja = [];
 async function loadAndRenderCaja() {
+  if (_caja.length) { renderCaja(); return; }
   _caja = await sheetsGet('CAJA');
   renderCaja();
 }
@@ -3802,6 +3939,7 @@ async function deleteCaja(id) {
 // ─── EXTRACTO BANCARIO ───────────────────────────────────────────
 let _extracto=[];
 async function loadAndRenderExtracto() {
+  if (_extracto.length) { renderExtracto(); return; }
   _extracto=await sheetsGet('EXTRACTO');
   renderExtracto();
 }
@@ -4206,7 +4344,10 @@ async function processAfipPlanFile(file) {
 let _cierresFacturas = [], _cierresCobros = [], _cierresGastos = [];
 
 async function loadAndRenderCierres() {
-  // Use globals already loaded at login — only fetch if missing
+  if (_facturas.length && _cobros.length && _gastos.length) {
+    _cierresFacturas=_facturas; _cierresCobros=_cobros; _cierresGastos=_gastos;
+    renderCierres(); return;
+  }
   if (!_facturas.length) _facturas = await sheetsGet('FACTURAS');
   if (!_cobros.length)   _cobros   = await sheetsGet('COBROS');
   if (!_gastos.length)   _gastos   = await sheetsGet('GASTOS').catch(() => []);
