@@ -213,6 +213,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="nav-item" onclick="navigate('cc-clientes')"><i class="fa-solid fa-users"></i> CC Clientes</div>
     <div class="nav-item" onclick="navigate('cc-proveedores')"><i class="fa-solid fa-truck"></i> CC Proveedores</div>
     <div class="nav-item" onclick="navigate('gastos')"><i class="fa-solid fa-receipt"></i> Estructura</div>
+    <div class="nav-item" onclick="navigate('rentabilidad')"><i class="fa-solid fa-chart-line"></i> Rentabilidad</div>
     <div class="nav-item" onclick="navigate('servicios')"><i class="fa-solid fa-bolt"></i> Servicios</div>
     <div class="nav-item" onclick="navigate('extracto')"><i class="fa-solid fa-building-columns"></i> Extracto</div>
     <div class="nav-item" onclick="navigate('caja')"><i class="fa-solid fa-cash-register"></i> Caja</div>
@@ -489,6 +490,33 @@ tr:hover td{background:rgba(255,255,255,.03)}
   </div>
 </div>
 
+<!-- RENTABILIDAD -->
+<div id="section-rentabilidad" class="section">
+  <div class="page-header">
+    <h2><i class="fa-solid fa-chart-line"></i> Rentabilidad por Proyecto</h2>
+    <div style="display:flex;gap:8px;align-items:center">
+      <select id="rent-year" onchange="renderRentabilidad()"></select>
+      <select id="rent-month" onchange="renderRentabilidad()"><option value="">Todo el año</option><option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option><option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option><option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option></select>
+    </div>
+  </div>
+  <div id="rent-summary" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px"></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Cliente / Proyecto</th><th style="text-align:right">Facturado</th><th style="text-align:right">Costos asignados</th><th style="text-align:right">Margen $</th><th style="text-align:right">Margen %</th></tr></thead>
+      <tbody id="rent-tbody"></tbody>
+    </table>
+  </div>
+  <div style="margin-top:20px">
+    <h3 style="font-size:14px;font-weight:600;margin-bottom:12px;color:var(--muted)">Compras sin proyecto asignado</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Fecha</th><th>Proveedor</th><th>Concepto</th><th style="text-align:right">Neto</th></tr></thead>
+        <tbody id="rent-sin-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <!-- CAJA -->
 <div id="section-caja" class="section">
   <div class="page-header">
@@ -581,12 +609,13 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="modal-header"><h3><i class="fa-solid fa-tag"></i> Asignar Rubro</h3><button class="modal-close" onclick="closeModal('modal-tag')">×</button></div>
     <div class="modal-body">
       <div class="form-group"><label>Rubro</label>
-        <select id="tag-rubro" onchange="document.getElementById('tag-cat-group').style.display=this.value==='estructura'?'block':'none'">
+        <select id="tag-rubro" onchange="toggleTagRubro()">
           <option value="">— Sin asignar —</option>
           <option value="estructura">Estructura</option>
+          <option value="proyecto">Proyecto / Cliente</option>
         </select>
       </div>
-      <div class="form-group" id="tag-cat-group" style="display:none"><label>Categoría</label>
+      <div class="form-group" id="tag-cat-group" style="display:none"><label>Categoría Estructura</label>
         <select id="tag-cat">
           <option value="honorarios">Honorarios</option>
           <option value="servicios_ext">Servicios externos</option>
@@ -599,6 +628,10 @@ tr:hover td{background:rgba(255,255,255,.03)}
           <option value="papelería">Papelería</option>
           <option value="otros">Otros</option>
         </select>
+      </div>
+      <div class="form-group" id="tag-proyecto-group" style="display:none"><label>Cliente / Proyecto</label>
+        <input id="tag-proyecto" list="tag-proyecto-list" placeholder="Nombre del cliente...">
+        <datalist id="tag-proyecto-list"></datalist>
       </div>
     </div>
     <div class="modal-footer">
@@ -696,6 +729,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
             <select id="fac-rubro" onchange="toggleFacRubro()">
               <option value="">— Sin asignar —</option>
               <option value="estructura">Estructura</option>
+              <option value="proyecto">Proyecto / Cliente</option>
             </select>
           </div>
           <div class="form-group" id="fac-cat-estructura-group" style="flex:1;display:none">
@@ -712,6 +746,11 @@ tr:hover td{background:rgba(255,255,255,.03)}
               <option value="papelería">Papelería</option>
               <option value="otros">Otros</option>
             </select>
+          </div>
+          <div class="form-group" id="fac-proyecto-group" style="flex:1;display:none">
+            <label>Cliente / Proyecto</label>
+            <input id="fac-proyecto" list="fac-proyecto-list" placeholder="Nombre del cliente...">
+            <datalist id="fac-proyecto-list"></datalist>
           </div>
         </div>
         <div id="fac-nc-ref-group" class="form-group" style="display:none">
@@ -1386,6 +1425,7 @@ function navigate(section) {
   if (section === 'cc-clientes') loadAndRenderCCClientes();
   if (section === 'cc-proveedores') loadAndRenderCCProveedores();
   if (section === 'gastos') loadAndRenderGastos();
+  if (section === 'rentabilidad') loadAndRenderRentabilidad();
   if (section === 'servicios') loadAndRenderServicios();
   if (section === 'extracto') loadAndRenderExtracto();
   if (section === 'caja') loadAndRenderCaja();
@@ -1693,7 +1733,7 @@ function renderFacturas() {
       <td>${docBadge(String(r[6]).toUpperCase())}</td>
       <td>${badge(String(r[5]).toLowerCase()==='venta'?'Venta':'Compra', String(r[5]).toLowerCase())}</td>
       <td>${r[4]}${String(r[5]).toLowerCase()==='venta'&&!CLIENTES_CONOCIDOS.some(c=>String(r[4]).toUpperCase().includes(c))?'<br><span class="badge badge-otros">OTROS</span>':''}<br><small style="color:var(--muted)">${r[3]}</small></td>
-      <td style="font-size:12px;color:var(--muted)">${isNCrow?`<span style="color:#e53e3e">${r[11]||''}</span>`:(r[13]||'')}${r[20]==='estructura'?`<br><span class="badge" style="background:rgba(139,92,246,.15);color:#8b5cf6;font-size:10px">${GASTO_CATS[r[21]]||r[21]||'Estructura'}</span>`:''}</td>
+      <td style="font-size:12px;color:var(--muted)">${isNCrow?`<span style="color:#e53e3e">${r[11]||''}</span>`:(r[13]||'')}${r[20]==='estructura'?`<br><span class="badge" style="background:rgba(139,92,246,.15);color:#8b5cf6;font-size:10px">${GASTO_CATS[r[21]]||r[21]||'Estructura'}</span>`:''}${r[20]==='proyecto'?`<br><span class="badge" style="background:rgba(16,185,129,.12);color:#059669;font-size:10px"><i class="fa-solid fa-user-tie" style="margin-right:3px"></i>${r[21]||'Proyecto'}</span>`:''}</td>
       <td style="font-size:12px;color:var(--muted)">${r[12]||''}</td>
       <td${red}>${fmtARS(r[7])}</td>
       <td${red}>${fmtARS(r[8])}</td>
@@ -1850,6 +1890,7 @@ function openFacturaModal() {
   const alEl=document.getElementById('fac-iva-alicuota'); if(alEl){alEl.value='0.21';alEl.disabled=false;}
   document.getElementById('fac-rubro').value='';
   document.getElementById('fac-cat-estructura-group').style.display='none';
+  document.getElementById('fac-proyecto-group').style.display='none';
   toggleMonedaExt();
   populateMaestroSelect();
   openModal('modal-factura');
@@ -1857,6 +1898,22 @@ function openFacturaModal() {
 function toggleFacRubro(){
   const v=document.getElementById('fac-rubro').value;
   document.getElementById('fac-cat-estructura-group').style.display=v==='estructura'?'block':'none';
+  document.getElementById('fac-proyecto-group').style.display=v==='proyecto'?'block':'none';
+  if(v==='proyecto') populateProyectoDatalist('fac-proyecto-list');
+}
+function toggleTagRubro(){
+  const v=document.getElementById('tag-rubro').value;
+  document.getElementById('tag-cat-group').style.display=v==='estructura'?'block':'none';
+  document.getElementById('tag-proyecto-group').style.display=v==='proyecto'?'block':'none';
+  if(v==='proyecto') populateProyectoDatalist('tag-proyecto-list');
+}
+function populateProyectoDatalist(dlId){
+  const dl=document.getElementById(dlId); if(!dl) return;
+  dl.innerHTML='';
+  const nombres=new Set();
+  _maestro.filter(r=>String(r[3]).toLowerCase()==='cliente').forEach(r=>nombres.add(String(r[1]).trim()));
+  _facturas.filter(r=>String(r[5]).toLowerCase()==='venta').forEach(r=>nombres.add(String(r[4]).trim()));
+  [...nombres].filter(Boolean).sort().forEach(n=>{const o=document.createElement('option');o.value=n;dl.appendChild(o);});
 }
 function editFactura(id) {
   const r = _facturas.find(x=>x[0]===id); if (!r) return;
@@ -1903,8 +1960,11 @@ function editFactura(id) {
   }
   document.getElementById('fac-rubro').value = r[20]||'';
   const hasCat = (r[20]||'') === 'estructura';
+  const hasProyecto = (r[20]||'') === 'proyecto';
   document.getElementById('fac-cat-estructura-group').style.display = hasCat ? 'block' : 'none';
+  document.getElementById('fac-proyecto-group').style.display = hasProyecto ? 'block' : 'none';
   if (hasCat) document.getElementById('fac-cat-estructura').value = r[21]||'honorarios';
+  if (hasProyecto) { populateProyectoDatalist('fac-proyecto-list'); document.getElementById('fac-proyecto').value = r[21]||''; }
   populateMaestroSelect();
   openModal('modal-factura');
 }
@@ -2033,7 +2093,9 @@ async function saveFactura() {
   const cae = String(document.getElementById('fac-cae')?.value||'').replace(/\D/g,'');
   const ivaAlicuota = Number(document.getElementById('fac-iva-alicuota')?.value||0.21);
   const rubro = tipo === 'compra' ? (document.getElementById('fac-rubro')?.value||'') : '';
-  const catEstructura = rubro === 'estructura' ? (document.getElementById('fac-cat-estructura')?.value||'') : '';
+  const catEstructura = rubro === 'estructura' ? (document.getElementById('fac-cat-estructura')?.value||'')
+                      : rubro === 'proyecto'   ? (document.getElementById('fac-proyecto')?.value||'')
+                      : '';
 
   if (_facturaEditId) {
     const fac = _facturas.find(r=>r[0]===_facturaEditId);
@@ -2095,15 +2157,20 @@ function openTagModal(id) {
   _tagFacturaId = id;
   document.getElementById('tag-rubro').value = r[20]||'';
   const hasCat = (r[20]||'') === 'estructura';
+  const hasProyecto = (r[20]||'') === 'proyecto';
   document.getElementById('tag-cat-group').style.display = hasCat ? 'block' : 'none';
+  document.getElementById('tag-proyecto-group').style.display = hasProyecto ? 'block' : 'none';
   if (hasCat) document.getElementById('tag-cat').value = r[21]||'honorarios';
+  if (hasProyecto) { populateProyectoDatalist('tag-proyecto-list'); document.getElementById('tag-proyecto').value = r[21]||''; }
   document.getElementById('tag-save-btn').disabled = false;
   openModal('modal-tag');
 }
 async function saveTag() {
   const btn = document.getElementById('tag-save-btn'); btn.disabled = true;
   const rubro = document.getElementById('tag-rubro').value;
-  const cat = rubro === 'estructura' ? document.getElementById('tag-cat').value : '';
+  const cat = rubro === 'estructura' ? document.getElementById('tag-cat').value
+            : rubro === 'proyecto'   ? document.getElementById('tag-proyecto').value
+            : '';
   try {
     await Promise.all([
       sheetsUpdateById('FACTURAS', _tagFacturaId, 'U', rubro),
@@ -3520,6 +3587,86 @@ let _gastos=[];
 async function loadAndRenderGastos() {
   _gastos=await sheetsGet('GASTOS');
   renderGastos();
+}
+
+async function loadAndRenderRentabilidad() {
+  yearOptions('rent-year');
+  if (!_facturas.length) _facturas = await sheetsGet('FACTURAS');
+  renderRentabilidad();
+}
+function renderRentabilidad() {
+  const year = getFilter('rent-year'), month = getFilter('rent-month');
+  const prefix = year + (month ? '-'+month : '');
+  const d = r => String(r.fecha||r[1]||'');
+
+  // Ventas filtradas por período
+  const ventas = _facturas.filter(r => {
+    if (String(r[5]).toLowerCase() !== 'venta') return false;
+    if (String(r[6]).toUpperCase() === 'NC') return false;
+    const f = String(r[1]||''); return f.startsWith(prefix);
+  });
+  // Compras con rubro=proyecto filtradas por período
+  const costos = _facturas.filter(r => {
+    if (String(r[5]).toLowerCase() !== 'compra') return false;
+    if (String(r[20]||'').toLowerCase() !== 'proyecto') return false;
+    const f = String(r[1]||''); return f.startsWith(prefix);
+  });
+  // Compras SIN rubro asignado
+  const sinAsignar = _facturas.filter(r => {
+    if (String(r[5]).toLowerCase() !== 'compra') return false;
+    if (r[20]) return false;
+    const f = String(r[1]||''); return f.startsWith(prefix);
+  });
+
+  // Agrupar ventas por cliente (razon social = r[4])
+  const clienteMap = {};
+  ventas.forEach(r => {
+    const key = String(r[4]||'—').trim();
+    if (!clienteMap[key]) clienteMap[key] = { ventas: 0, costos: 0 };
+    clienteMap[key].ventas += Math.abs(Number(r[9]||0));
+  });
+  costos.forEach(r => {
+    const key = String(r[21]||'—').trim();
+    if (!clienteMap[key]) clienteMap[key] = { ventas: 0, costos: 0 };
+    clienteMap[key].costos += Math.abs(Number(r[7]||0));
+  });
+
+  const rows = Object.entries(clienteMap).sort((a,b)=>b[1].ventas-a[1].ventas);
+  const totalVentas = rows.reduce((s,[,v])=>s+v.ventas,0);
+  const totalCostos = rows.reduce((s,[,v])=>s+v.costos,0);
+  const totalMargen = totalVentas - totalCostos;
+
+  // Summary cards
+  const fmt = n => '$'+n.toLocaleString('es-AR',{maximumFractionDigits:0});
+  document.getElementById('rent-summary').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Total Facturado</div><div class="stat-value">${fmt(totalVentas)}</div></div>
+    <div class="stat-card"><div class="stat-label">Costos Asignados</div><div class="stat-value">${fmt(totalCostos)}</div></div>
+    <div class="stat-card" style="border-left:3px solid ${totalMargen>=0?'var(--success)':'var(--danger)'}">
+      <div class="stat-label">Margen Total</div>
+      <div class="stat-value" style="color:${totalMargen>=0?'var(--success)':'var(--danger)'}">${fmt(totalMargen)}</div>
+    </div>`;
+
+  const tbody = document.getElementById('rent-tbody');
+  if (!rows.length) { tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Sin datos para el período</td></tr>'; }
+  else tbody.innerHTML = rows.map(([cliente,v])=>{
+    const margen = v.ventas - v.costos;
+    const pct = v.ventas > 0 ? (margen/v.ventas*100).toFixed(1) : '—';
+    const color = margen >= 0 ? 'var(--success)' : 'var(--danger)';
+    return `<tr>
+      <td style="font-weight:500">${cliente}</td>
+      <td style="text-align:right">${fmt(v.ventas)}</td>
+      <td style="text-align:right">${fmt(v.costos)}</td>
+      <td style="text-align:right;color:${color};font-weight:600">${fmt(margen)}</td>
+      <td style="text-align:right;color:${color}">${v.ventas>0?pct+'%':'—'}</td>
+    </tr>`;
+  }).join('');
+
+  const sinTbody = document.getElementById('rent-sin-tbody');
+  if (!sinAsignar.length) { sinTbody.innerHTML='<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--muted)">Todas las compras tienen proyecto asignado ✓</td></tr>'; }
+  else sinTbody.innerHTML = sinAsignar.map(r=>`<tr>
+    <td>${r[1]||''}</td><td>${r[4]||''}</td><td>${r[13]||''}</td>
+    <td style="text-align:right">$${Math.abs(Number(r[7]||0)).toLocaleString('es-AR',{maximumFractionDigits:0})}</td>
+  </tr>`).join('');
 }
 const GASTO_CATS = {
   'sueldos':'Sueldos y Jornales','alquiler':'Alquiler','servicios_ext':'Servicios externos',
