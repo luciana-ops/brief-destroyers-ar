@@ -512,9 +512,9 @@ tr:hover td{background:rgba(255,255,255,.03)}
 </div>
 
 <!-- MODAL REGISTRAR PAGO AFIP -->
-<div class="modal-overlay" id="modal-pago-afip">
+<div class="modal-overlay" id="modal-pago-afip" style="display:none">
   <div class="modal" style="max-width:420px">
-    <div class="modal-header"><h3 id="pago-afip-title">Registrar pago de cuota</h3><button class="modal-close" onclick="closeModal('modal-pago-afip')">×</button></div>
+    <div class="modal-header"><h3 id="pago-afip-title">Registrar pago de cuota</h3><button class="modal-close" onclick="document.getElementById('modal-pago-afip').style.display='none'">×</button></div>
     <div class="modal-body">
       <div style="background:var(--bg-2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px" id="pago-afip-info"></div>
       <div class="form-group">
@@ -536,7 +536,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
       <input type="hidden" id="pago-afip-cuota-idx">
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-pago-afip')">Cancelar</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('modal-pago-afip').style.display='none'">Cancelar</button>
       <button class="btn btn-primary" onclick="savePagoAfip()">Registrar pago</button>
     </div>
   </div>
@@ -4351,7 +4351,7 @@ function openPagoAfipModal(planId, cuotaIdx) {
   document.getElementById('pago-afip-v1').checked = true;
   if (!v2) { document.getElementById('pago-afip-v2').disabled = true; document.getElementById('pago-afip-v2').parentElement.style.opacity = '.4'; }
   else { document.getElementById('pago-afip-v2').disabled = false; document.getElementById('pago-afip-v2').parentElement.style.opacity = '1'; }
-  openModal('modal-pago-afip');
+  document.getElementById('modal-pago-afip').style.display = 'flex';
 }
 
 async function savePagoAfip() {
@@ -4370,7 +4370,7 @@ async function savePagoAfip() {
   renderPlanesAfipTab();
   // also refresh estructura/cierres if visible
   if (document.getElementById('section-gastos')?.classList.contains('active')) renderGastos();
-  closeModal('modal-pago-afip');
+  document.getElementById('modal-pago-afip').style.display = 'none';
   toast('Pago registrado — aparecerá en Estructura y Cierres');
   sheetsUpdateById('PLANES_AFIP', planId, 'E', plan[4]).catch(e => toast('Error al sincronizar: '+e.message,'error'));
 }
