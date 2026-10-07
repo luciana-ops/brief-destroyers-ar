@@ -218,6 +218,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="nav-item" onclick="navigate('caja')"><i class="fa-solid fa-cash-register"></i> Caja</div>
     <div class="nav-item" onclick="navigate('maestro')"><i class="fa-solid fa-address-book"></i> Maestro</div>
     <div class="nav-item" onclick="navigate('cierres')"><i class="fa-solid fa-calendar-check"></i> Cierres</div>
+    <div class="nav-item" onclick="navigate('planes-afip')"><i class="fa-solid fa-landmark"></i> Planes AFIP</div>
   </nav>
   <div id="sidebar-footer">Sesión: <span id="user-label">—</span></div>
 </div>
@@ -490,6 +491,53 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="table-wrap" style="margin-top:12px">
       <table><thead><tr><th>Adhesión</th><th>Nro Plan</th><th>Concepto / Impuesto</th><th>Cuotas</th><th>Próx vencimiento</th><th>Deuda restante</th><th></th></tr></thead>
       <tbody id="afip-tbody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- PLANES AFIP -->
+<div id="section-planes-afip" class="section">
+  <div class="page-header">
+    <h2><i class="fa-solid fa-landmark"></i> Planes AFIP</h2>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-secondary" onclick="openPlanAfipModal()"><i class="fa-solid fa-plus"></i> Nuevo plan manual</button>
+    </div>
+  </div>
+  <div class="dropzone" id="afip-dropzone2" onclick="document.getElementById('afip-file2').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleAfipPlanDrop2(event)" style="margin-bottom:16px;padding:18px">
+    <i class="fa-solid fa-file-arrow-up"></i>
+    <p>Arrastrá el PDF del plan de facilidades de pago AFIP — la IA carga todas las cuotas automáticamente<br><span id="afip-loading2" style="display:none"><i class="fa-solid fa-spinner fa-spin"></i> Leyendo...</span></p>
+  </div>
+  <input type="file" id="afip-file2" style="display:none" accept=".pdf,.png,.jpg,.jpeg" onchange="handleAfipPlanFileInput2(this)">
+  <div id="planes-afip-list"></div>
+</div>
+
+<!-- MODAL REGISTRAR PAGO AFIP -->
+<div class="modal-overlay" id="modal-pago-afip">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header"><h3 id="pago-afip-title">Registrar pago de cuota</h3><button class="modal-close" onclick="closeModal('modal-pago-afip')">×</button></div>
+    <div class="modal-body">
+      <div style="background:var(--bg-2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px" id="pago-afip-info"></div>
+      <div class="form-group">
+        <label>Mes de pago</label>
+        <input type="month" id="pago-afip-mes" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 10px;font-size:13px">
+      </div>
+      <div class="form-group">
+        <label>Vencimiento utilizado</label>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:normal">
+            <input type="radio" name="pago-afip-venc" value="1" id="pago-afip-v1" style="width:16px;height:16px"> 1° vencimiento <span id="pago-afip-v1-fecha" style="color:var(--muted);font-size:12px"></span>
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:normal">
+            <input type="radio" name="pago-afip-venc" value="2" id="pago-afip-v2" style="width:16px;height:16px"> 2° vencimiento <span id="pago-afip-v2-fecha" style="color:var(--muted);font-size:12px"></span>
+          </label>
+        </div>
+      </div>
+      <input type="hidden" id="pago-afip-plan-id">
+      <input type="hidden" id="pago-afip-cuota-idx">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-pago-afip')">Cancelar</button>
+      <button class="btn btn-primary" onclick="savePagoAfip()">Registrar pago</button>
     </div>
   </div>
 </div>
@@ -1183,7 +1231,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
       <div style="margin:12px 0 6px;font-weight:600;font-size:14px">Cuotas</div>
       <div id="afip-cuotas-container" style="max-height:340px;overflow-y:auto">
         <table style="width:100%;font-size:13px;border-collapse:collapse" id="afip-cuotas-table">
-          <thead><tr style="background:var(--bg-2)"><th style="padding:6px 8px;text-align:left">Cuota</th><th style="padding:6px 8px;text-align:left">Vencimiento</th><th style="padding:6px 8px;text-align:right">Monto</th><th style="padding:6px 8px;text-align:center">Pagada</th><th style="padding:6px 4px"></th></tr></thead>
+          <thead><tr style="background:var(--bg-2)"><th style="padding:6px 8px;text-align:left">Cuota</th><th style="padding:6px 8px;text-align:left">1° Vencimiento</th><th style="padding:6px 8px;text-align:left">2° Vencimiento</th><th style="padding:6px 8px;text-align:right">Monto</th><th style="padding:6px 4px"></th></tr></thead>
           <tbody id="afip-cuotas-body"></tbody>
         </table>
       </div>
@@ -1370,7 +1418,7 @@ function pinCheck() {
 }
 
 // ─── APP INIT ────────────────────────────────────────────────────
-const ALL_SHEETS = ['FACTURAS','PAGOS','COBROS','MAESTRO','RETENCIONES','CHEQUES_RECIBIDOS','CHEQUES_EMITIDOS','GASTOS'];
+const ALL_SHEETS = ['FACTURAS','PAGOS','COBROS','MAESTRO','RETENCIONES','CHEQUES_RECIBIDOS','CHEQUES_EMITIDOS','GASTOS','PLANES_AFIP'];
 
 async function _preloadSheets(sheetNames) {
   const results = await Promise.all(sheetNames.map(s => sheetsGet(s)));
@@ -1388,6 +1436,7 @@ function _applySheetData(map) {
   if (map.GASTOS)            _gastos       = map.GASTOS;
   if (map.CHEQUES_RECIBIDOS) _chequesRec   = map.CHEQUES_RECIBIDOS;
   if (map.CHEQUES_EMITIDOS)  _chequesEmi   = map.CHEQUES_EMITIDOS;
+  if (map.PLANES_AFIP)       _planesAfip   = map.PLANES_AFIP;
   populateMaestroSelect();
 }
 
@@ -1475,6 +1524,7 @@ function navigate(section) {
   if (section === 'gastos') loadAndRenderGastos();
   if (section === 'rentabilidad') loadAndRenderRentabilidad();
   if (section === 'servicios') loadAndRenderServicios();
+  if (section === 'planes-afip') loadAndRenderPlanesAfip();
   if (section === 'extracto') loadAndRenderExtracto();
   if (section === 'caja') loadAndRenderCaja();
   if (section === 'maestro') loadAndRenderMaestro();
@@ -2164,12 +2214,11 @@ async function saveFactura() {
     const vals = [fecha, folio, cuit, razon, tipo, tipoDoc,
       isNC?-Math.abs(neto):neto, isNC?-Math.abs(iva):iva, isNC?-Math.abs(total):total,
       fac?fac[10]:'pendiente', notas, oc, concepto, moneda, tc, impExt, otrosImpJSON, cae, ivaAlicuota, rubro, catEstructura];
-    try {
-      await Promise.all(cols.map((c,i)=>sheetsUpdateById('FACTURAS',_facturaEditId,c,vals[i])));
-      if (fac) { vals.forEach((v,i)=>fac[i+1]=v); }
-      saveLSSnapshot();
-      renderFacturas(); closeModal('modal-factura'); toast('Factura actualizada');
-    } catch(e) { toast('Error: '+e.message,'error'); btn.disabled=false; }
+    if (fac) { vals.forEach((v,i)=>fac[i+1]=v); }
+    saveLSSnapshot();
+    renderFacturas(); closeModal('modal-factura'); toast('Factura actualizada');
+    Promise.all(cols.map((c,i)=>sheetsUpdateById('FACTURAS',_facturaEditId,c,vals[i])))
+      .catch(e => toast('Error al sincronizar con Google: '+e.message,'error'));
     return;
   }
 
@@ -2177,40 +2226,35 @@ async function saveFactura() {
   const row = [id, fecha, folio, cuit, razon, tipo, tipoDoc,
     isNC ? -Math.abs(neto) : neto, isNC ? -Math.abs(iva) : iva, isNC ? -Math.abs(total) : total,
     isNC ? 'anulada' : 'pendiente', notas, oc, concepto, moneda, tc, impExt, otrosImpJSON, cae, ivaAlicuota, rubro, catEstructura];
-  try {
-    await sheetsAppend('FACTURAS', [row]);
-    _facturas.push(row);
-    if (isNC && ncRef) {
-      // Normaliza a solo dígitos para tolerar formatos "A-0001-001" vs "0001-001"
-      const normFolio = f => String(f||'').replace(/\D/g,'');
-      const ncRefNorm = normFolio(ncRef);
-      const ref = ncRefNorm ? (
-        _facturas.find(r =>
-          String(r[6]).toUpperCase() !== 'NC' &&
-          normFolio(r[2]) === ncRefNorm &&
-          String(r[3]).trim() === String(cuit).trim()
-        ) || _facturas.find(r =>
-          String(r[6]).toUpperCase() !== 'NC' &&
-          normFolio(r[2]) === ncRefNorm
-        )
-      ) : null;
-      if (ref) {
-        const ncTotal = Math.abs(total);
-        const facTotal = Math.abs(Number(ref[9]||0));
-        const nuevoEstado = ncTotal >= facTotal ? 'anulada' : 'anulada_parcial';
-        await sheetsUpdateById('FACTURAS', ref[0], 'K', nuevoEstado);
-        ref[10] = nuevoEstado;
-        toast(nuevoEstado === 'anulada'
-          ? 'Factura '+ref[2]+' marcada como anulada'
-          : 'Factura '+ref[2]+' marcada como NC parcial (saldo pendiente)');
-      } else toast('NC guardada — factura referenciada no encontrada en el sistema','warning');
-    }
-    autoRegistrarContacto(cuit, razon, tipo);
-    saveLSSnapshot();
-    renderFacturas();
-    closeModal('modal-factura');
-    toast('Factura guardada');
-  } catch(e) { toast('Error guardando: ' + e.message, 'error'); btn.disabled = false; }
+  _facturas.push(row);
+  if (isNC && ncRef) {
+    const normFolio = f => String(f||'').replace(/\D/g,'');
+    const ncRefNorm = normFolio(ncRef);
+    const ref = ncRefNorm ? (
+      _facturas.find(r =>
+        String(r[6]).toUpperCase() !== 'NC' &&
+        normFolio(r[2]) === ncRefNorm &&
+        String(r[3]).trim() === String(cuit).trim()
+      ) || _facturas.find(r =>
+        String(r[6]).toUpperCase() !== 'NC' &&
+        normFolio(r[2]) === ncRefNorm
+      )
+    ) : null;
+    if (ref) {
+      const ncTotal = Math.abs(total);
+      const facTotal = Math.abs(Number(ref[9]||0));
+      const nuevoEstado = ncTotal >= facTotal ? 'anulada' : 'anulada_parcial';
+      ref[10] = nuevoEstado;
+      sheetsUpdateById('FACTURAS', ref[0], 'K', nuevoEstado).catch(()=>{});
+      toast(nuevoEstado === 'anulada'
+        ? 'Factura '+ref[2]+' marcada como anulada'
+        : 'Factura '+ref[2]+' marcada como NC parcial (saldo pendiente)');
+    } else toast('NC guardada — factura referenciada no encontrada en el sistema','warning');
+  }
+  autoRegistrarContacto(cuit, razon, tipo);
+  saveLSSnapshot();
+  renderFacturas(); closeModal('modal-factura'); toast('Factura guardada');
+  sheetsAppend('FACTURAS', [row]).catch(e => toast('Error al sincronizar con Google: '+e.message,'error'));
 }
 let _tagFacturaId = null;
 function openTagModal(id) {
@@ -2227,23 +2271,20 @@ function openTagModal(id) {
   openModal('modal-tag');
 }
 async function saveTag() {
-  const btn = document.getElementById('tag-save-btn'); btn.disabled = true;
   const rubro = document.getElementById('tag-rubro').value;
   const cat = rubro === 'estructura' ? document.getElementById('tag-cat').value
             : rubro === 'proyecto'   ? document.getElementById('tag-proyecto').value
             : '';
-  try {
-    await Promise.all([
-      sheetsUpdateById('FACTURAS', _tagFacturaId, 'U', rubro),
-      sheetsUpdateById('FACTURAS', _tagFacturaId, 'V', cat)
-    ]);
-    const fac = _facturas.find(r=>r[0]===_tagFacturaId);
-    if (fac) { fac[20]=rubro; fac[21]=cat; }
-    saveLSSnapshot();
-    renderFacturas();
-    closeModal('modal-tag');
-    toast('Rubro asignado');
-  } catch(e) { toast('Error: '+e.message,'error'); btn.disabled=false; }
+  const fac = _facturas.find(r=>r[0]===_tagFacturaId);
+  if (fac) { fac[20]=rubro; fac[21]=cat; }
+  saveLSSnapshot();
+  renderFacturas();
+  closeModal('modal-tag');
+  toast('Rubro asignado');
+  Promise.all([
+    sheetsUpdateById('FACTURAS', _tagFacturaId, 'U', rubro),
+    sheetsUpdateById('FACTURAS', _tagFacturaId, 'V', cat)
+  ]).catch(e => toast('Error al sincronizar: '+e.message,'error'));
 }
 function updateBatchBar(){
   const checks=[...document.querySelectorAll('.compra-check:checked')];
@@ -2277,23 +2318,20 @@ function openBatchTagModal(){
   openModal('modal-batch-tag');
 }
 async function saveBatchTag(){
-  const btn=document.getElementById('batch-save-btn'); btn.disabled=true;
   const rubro=document.getElementById('batch-rubro').value;
   const cat=rubro==='estructura'?document.getElementById('batch-cat').value
             :rubro==='proyecto'?document.getElementById('batch-proyecto').value:'';
   const ids=[...document.querySelectorAll('.compra-check:checked')].map(c=>c.dataset.id);
-  try {
-    await Promise.all(ids.flatMap(id=>[
-      sheetsUpdateById('FACTURAS',id,'U',rubro),
-      sheetsUpdateById('FACTURAS',id,'V',cat)
-    ]));
-    ids.forEach(id=>{const f=_facturas.find(r=>r[0]===id);if(f){f[20]=rubro;f[21]=cat;}});
-    saveLSSnapshot();
-    clearComprasSelection();
-    renderFacturas();
-    closeModal('modal-batch-tag');
-    toast(`Rubro asignado a ${ids.length} factura${ids.length!==1?'s':''}`);
-  } catch(e){toast('Error: '+e.message,'error');btn.disabled=false;}
+  ids.forEach(id=>{const f=_facturas.find(r=>r[0]===id);if(f){f[20]=rubro;f[21]=cat;}});
+  saveLSSnapshot();
+  clearComprasSelection();
+  renderFacturas();
+  closeModal('modal-batch-tag');
+  toast(`Rubro asignado a ${ids.length} factura${ids.length!==1?'s':''}`);
+  Promise.all(ids.flatMap(id=>[
+    sheetsUpdateById('FACTURAS',id,'U',rubro),
+    sheetsUpdateById('FACTURAS',id,'V',cat)
+  ])).catch(e=>toast('Error al sincronizar: '+e.message,'error'));
 }
 function autoRegistrarContacto(cuit, razon, tipoFac) {
   if (!cuit || !razon) return;
@@ -3798,13 +3836,26 @@ const GASTO_CATS = {
   'sueldos':'Sueldos y Jornales','alquiler':'Alquiler','servicios_ext':'Servicios externos',
   'seguros':'Seguros y Pólizas','honorarios':'Honorarios','comisiones':'Comisiones',
   'transporte':'Transporte','alimentación':'Alimentación','papelería':'Papelería',
-  'servicios':'Servicios','otros':'Otros'
+  'servicios':'Servicios','planes_afip':'Planes AFIP','otros':'Otros'
 };
 function getEstructuraCombined() {
-  // Gastos without a project = pure structure costs
   const fromGastos = _gastos.filter(r=>!r[8]).map(r=>({id:r[0],fecha:r[1],desc:r[2],cat:r[3],monto:Number(r[4]||0),source:'gasto',deleteId:r[0],proyecto:''}));
   const fromFacturas = _facturas.filter(r=>String(r[5]).toLowerCase()==='compra'&&String(r[20]).toLowerCase()==='estructura').map(r=>({id:r[0],fecha:r[1],desc:r[4]+(r[13]?' — '+r[13]:''),cat:r[21]||'otros',monto:Math.abs(Number(r[7]||0)),source:'factura',deleteId:null,proyecto:''}));
-  return [...fromGastos,...fromFacturas].sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));
+  const fromAfip = (_planesAfip||[]).flatMap(p => {
+    let cuotas = [];
+    try { cuotas = JSON.parse(p[4]||'[]'); } catch {}
+    return cuotas.filter(c => c.pagada && c.fecha_pago).map(c => ({
+      id: p[0]+'-cuota-'+c.numero,
+      fecha: c.fecha_pago+'-01',
+      desc: `Plan AFIP ${p[2]||p[0]} — Cuota ${c.numero}`,
+      cat: 'planes_afip',
+      monto: Number(c.monto||0),
+      source: 'afip',
+      deleteId: null,
+      proyecto: ''
+    }));
+  });
+  return [...fromGastos,...fromFacturas,...fromAfip].sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));
 }
 function getProyectoGastos() {
   // Gastos with a project name assigned = go to rentabilidad
@@ -3846,17 +3897,15 @@ function openGastoModal() {
   openModal('modal-gasto');
 }
 async function saveGasto() {
-  const btn=document.getElementById('ga-save-btn');btn.disabled=true;
   const id='G'+Date.now();
   const periodo=document.getElementById('ga-periodo').value||today().substring(0,7);
   const fecha=periodo+'-01';
   const proyecto=document.getElementById('ga-proyecto')?.value||'';
   const row=[id,fecha,document.getElementById('ga-desc').value,document.getElementById('ga-cat').value,Number(document.getElementById('ga-monto').value)||0,document.getElementById('ga-quien').value,document.getElementById('ga-notas').value,document.getElementById('ga-medio').value,proyecto];
-  try {
-    await sheetsAppend('GASTOS',[row]);_gastos.push(row);
-    saveLSSnapshot();
-    renderGastos();closeModal('modal-gasto');toast('Gasto guardado');
-  } catch(e){toast('Error: '+e.message,'error');btn.disabled=false;}
+  _gastos.push(row);
+  saveLSSnapshot();
+  renderGastos();closeModal('modal-gasto');toast('Gasto guardado');
+  sheetsAppend('GASTOS',[row]).catch(e=>toast('Error al sincronizar con Google: '+e.message,'error'));
 }
 function exportGastosExcel() {
   const data=[['Fecha','Descripción','Categoría','Monto','Medio de pago','Quién','Notas'],..._gastos.map(r=>[d(r[1]),r[2],r[3],r[4],r[7]||'',r[5],r[6]])];
@@ -4187,7 +4236,187 @@ function exportServiciosExcel() {
   XLSX.writeFile(wb, 'servicios.xlsx');
 }
 
-// ===================== PLANES AFIP =====================
+// ===================== PLANES AFIP (TAB PROPIO) =====================
+
+async function loadAndRenderPlanesAfip() {
+  if (_planesAfip.length) { renderPlanesAfipTab(); return; }
+  const el = document.getElementById('planes-afip-list');
+  if (el) el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> Cargando...</div>';
+  _planesAfip = await sheetsGet('PLANES_AFIP');
+  saveLSSnapshot();
+  renderPlanesAfipTab();
+}
+
+function renderPlanesAfipTab() {
+  const el = document.getElementById('planes-afip-list');
+  if (!el) return;
+  if (!_planesAfip.length) {
+    el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted)"><i class="fa-solid fa-landmark" style="font-size:32px;opacity:.3;display:block;margin-bottom:12px"></i>Sin planes AFIP cargados.<br><small>Arrastrá el PDF del plan arriba o usá "Nuevo plan manual".</small></div>';
+    return;
+  }
+  const today = new Date().toISOString().slice(0,10);
+  el.innerHTML = _planesAfip.map((p, pi) => {
+    let cuotas = [];
+    try { cuotas = JSON.parse(p[4]||'[]'); } catch {}
+    const total = cuotas.length;
+    const pagadas = cuotas.filter(c => c.pagada).length;
+    const pct = total > 0 ? Math.round(pagadas/total*100) : 0;
+    const pendientes = cuotas.filter(c => !c.pagada);
+    const deuda = pendientes.reduce((s,c) => s+Number(c.monto||0), 0);
+    const proxVenc1 = pendientes.map(c => c.vencimiento1||c.vencimiento||'').filter(Boolean).sort()[0];
+    const vencida = proxVenc1 && proxVenc1 < today;
+    const cuotasHtml = cuotas.map((c, ci) => {
+      const v1 = c.vencimiento1 || c.vencimiento || '';
+      const v2 = c.vencimiento2 || '';
+      const isPagada = c.pagada;
+      return `<tr style="${isPagada?'opacity:.55':''}">
+        <td style="padding:6px 10px;font-weight:600">${c.numero||ci+1}</td>
+        <td style="padding:6px 10px">${v1?`<span${v1<today&&!isPagada?' style="color:#e53e3e;font-weight:600"':''}>${fmtFecha(v1)}</span>`:'<span style="color:var(--muted)">—</span>'}</td>
+        <td style="padding:6px 10px">${v2?`<span${v2<today&&!isPagada?' style="color:#e85d04;font-weight:500"':''}>${fmtFecha(v2)}</span>`:'<span style="color:var(--muted)">—</span>'}</td>
+        <td style="padding:6px 10px;text-align:right;font-weight:600">${fmtARS(c.monto||0)}</td>
+        <td style="padding:6px 10px">
+          ${isPagada
+            ? `<span class="badge" style="background:rgba(72,187,120,.15);color:#48bb78"><i class="fa-solid fa-check"></i> Pagada ${c.fecha_pago?'('+c.fecha_pago+')':''}</span>`
+            : `<span class="badge" style="background:rgba(245,158,11,.12);color:#f59e0b">Pendiente</span>`}
+        </td>
+        <td style="padding:6px 10px">
+          ${!isPagada ? `<button class="btn btn-primary btn-sm" onclick="openPagoAfipModal('${p[0]}',${ci})"><i class="fa-solid fa-check"></i> Registrar pago</button>` : ''}
+        </td>
+      </tr>`;
+    }).join('');
+    return `<div data-planid="${p[0]}" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;cursor:pointer;user-select:none" onclick="togglePlanAfipDetail(this)">
+        <i class="fa-solid fa-chevron-right" style="color:var(--muted);transition:.2s;font-size:11px"></i>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:14px">Plan ${p[2]||'—'}</div>
+          <div style="font-size:12px;color:var(--muted)">${p[3]||''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <div style="background:var(--bg-2);border-radius:4px;height:6px;width:80px;overflow:hidden">
+            <div style="width:${pct}%;height:100%;background:${pct===100?'var(--success,#48bb78)':'var(--accent)'};border-radius:4px;transition:.3s"></div>
+          </div>
+          <span style="font-size:12px;color:var(--muted);white-space:nowrap">${pagadas}/${total} cuotas</span>
+        </div>
+        ${deuda>0 ? `<span style="font-weight:700;font-size:13px;white-space:nowrap${vencida?';color:#e53e3e':''}">${fmtARS(deuda)}</span>` : '<span style="font-size:12px;color:var(--success,#48bb78);font-weight:600">Completo</span>'}
+        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openCuotasAfip('${p[0]}')" title="Editar plan"><i class="fa-solid fa-pen"></i></button>
+        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deletePlanAfip('${p[0]}')" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+      </div>
+      <div class="plan-detail" style="display:none;border-top:1px solid var(--border)">
+        <div style="overflow-x:auto">
+          <table style="width:100%;font-size:13px;border-collapse:collapse">
+            <thead><tr style="background:var(--bg-2)">
+              <th style="padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Cuota</th>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px">1° Vencimiento</th>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px">2° Vencimiento</th>
+              <th style="padding:8px 10px;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Monto</th>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Estado</th>
+              <th style="padding:8px 10px;font-size:11px"></th>
+            </tr></thead>
+            <tbody>${cuotasHtml}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function togglePlanAfipDetail(header) {
+  const card = header.closest('[data-planid]');
+  const detail = card.querySelector('.plan-detail');
+  const chevron = header.querySelector('i.fa-chevron-right');
+  if (!detail) return;
+  const isOpen = detail.style.display === 'none' || detail.style.display === '';
+  detail.style.display = isOpen ? 'block' : 'none';
+  if (chevron) chevron.style.transform = isOpen ? 'rotate(90deg)' : '';
+}
+
+let _pagoAfipPlanId = null, _pagoAfipCuotaIdx = null;
+function openPagoAfipModal(planId, cuotaIdx) {
+  const plan = _planesAfip.find(p => p[0] === planId);
+  if (!plan) return;
+  let cuotas = [];
+  try { cuotas = JSON.parse(plan[4]||'[]'); } catch {}
+  const cuota = cuotas[cuotaIdx];
+  if (!cuota) return;
+  _pagoAfipPlanId = planId;
+  _pagoAfipCuotaIdx = cuotaIdx;
+  document.getElementById('pago-afip-title').textContent = `Plan ${plan[2]||''} — Cuota ${cuota.numero||cuotaIdx+1}`;
+  document.getElementById('pago-afip-info').innerHTML = `<strong>${plan[3]||''}</strong><br>Monto: <strong>${fmtARS(cuota.monto||0)}</strong>`;
+  const now = new Date();
+  document.getElementById('pago-afip-mes').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const v1 = cuota.vencimiento1 || cuota.vencimiento || '';
+  const v2 = cuota.vencimiento2 || '';
+  document.getElementById('pago-afip-v1-fecha').textContent = v1 ? fmtFecha(v1) : '';
+  document.getElementById('pago-afip-v2-fecha').textContent = v2 ? fmtFecha(v2) : '';
+  document.getElementById('pago-afip-v1').checked = true;
+  if (!v2) { document.getElementById('pago-afip-v2').disabled = true; document.getElementById('pago-afip-v2').parentElement.style.opacity = '.4'; }
+  else { document.getElementById('pago-afip-v2').disabled = false; document.getElementById('pago-afip-v2').parentElement.style.opacity = '1'; }
+  openModal('modal-pago-afip');
+}
+
+async function savePagoAfip() {
+  const planId = _pagoAfipPlanId;
+  const cuotaIdx = _pagoAfipCuotaIdx;
+  const mes = document.getElementById('pago-afip-mes').value;
+  const tipoVenc = document.querySelector('input[name="pago-afip-venc"]:checked')?.value || '1';
+  if (!mes) return toast('Seleccioná el mes de pago','warning');
+  const plan = _planesAfip.find(p => p[0] === planId);
+  if (!plan) return;
+  let cuotas = [];
+  try { cuotas = JSON.parse(plan[4]||'[]'); } catch {}
+  cuotas[cuotaIdx] = { ...cuotas[cuotaIdx], pagada: true, fecha_pago: mes, tipo_pago: tipoVenc };
+  plan[4] = JSON.stringify(cuotas);
+  saveLSSnapshot();
+  renderPlanesAfipTab();
+  // also refresh estructura/cierres if visible
+  if (document.getElementById('section-gastos')?.classList.contains('active')) renderGastos();
+  closeModal('modal-pago-afip');
+  toast('Pago registrado — aparecerá en Estructura y Cierres');
+  sheetsUpdateById('PLANES_AFIP', planId, 'E', plan[4]).catch(e => toast('Error al sincronizar: '+e.message,'error'));
+}
+
+function handleAfipPlanDrop2(e) {
+  e.preventDefault(); document.getElementById('afip-dropzone2').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) processAfipPlanFile2(file);
+}
+function handleAfipPlanFileInput2(input) {
+  if (input.files[0]) processAfipPlanFile2(input.files[0]);
+  input.value='';
+}
+async function processAfipPlanFile2(file) {
+  document.getElementById('afip-loading2').style.display = 'inline';
+  try {
+    const base64 = await fileToBase64(file);
+    const mediaType = file.type === 'application/pdf' ? 'application/pdf' : file.type;
+    const prompt = `Extraé del plan de facilidades de pago AFIP en JSON estricto sin markdown: nro_plan (string), fecha_adhesion (YYYY-MM-DD), concepto (string), cuotas (array con: numero (int), vencimiento1 (YYYY-MM-DD, primer vencimiento), vencimiento2 (YYYY-MM-DD, segundo vencimiento), monto (número)). Incluí TODAS las cuotas. Solo JSON.`;
+    const raw = await callClaude(base64, mediaType, prompt);
+    const j = JSON.parse(raw.replace(/\`\`\`json\n?|\n?\`\`\`/g,'').trim());
+    openPlanAfipModal();
+    if (j.nro_plan) document.getElementById('afip-nro').value = j.nro_plan;
+    if (j.fecha_adhesion) document.getElementById('afip-fecha').value = j.fecha_adhesion;
+    if (j.concepto) document.getElementById('afip-concepto').value = j.concepto;
+    _afipCuotasTemp = (j.cuotas||[]).map(c => ({
+      numero: c.numero,
+      vencimiento1: c.vencimiento1||c.vencimiento||'',
+      vencimiento2: c.vencimiento2||'',
+      vencimiento: c.vencimiento1||c.vencimiento||'',
+      monto: Number(c.monto)||0,
+      pagada: false
+    }));
+    renderAfipCuotasTable(_afipCuotasTemp);
+    toast(`IA extrajo ${_afipCuotasTemp.length} cuotas — revisá y guardá`);
+  } catch(e) { toast('Error leyendo plan AFIP: '+e.message,'error'); }
+  document.getElementById('afip-loading2').style.display = 'none';
+}
+
+function fmtFecha(d) {
+  if (!d) return '—';
+  const p = String(d).slice(0,10).split('-');
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : d;
+}
+
+// ===================== PLANES AFIP (legacy — modal cuotas) =====================
 
 function renderPlanesAfip() {
   const tbody = document.getElementById('afip-tbody');
@@ -4243,13 +4472,15 @@ function renderAfipCuotasTable(cuotas) {
   const tbody = document.getElementById('afip-cuotas-body');
   tbody.innerHTML = cuotas.map((c,i) => `<tr id="afip-cuota-row-${i}" style="${c.pagada?'opacity:.6':''}">
     <td style="padding:4px 8px">${c.numero||i+1}</td>
-    <td style="padding:4px 8px"><input type="date" value="${c.vencimiento||''}" onchange="_afipCuotaEdit(${i},'vencimiento',this.value)" style="border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:4px;padding:2px 4px;font-size:12px"></td>
-    <td style="padding:4px 8px;text-align:right"><input type="number" value="${c.monto||''}" onchange="_afipCuotaEdit(${i},'monto',Number(this.value))" style="border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:4px;padding:2px 4px;font-size:12px;width:90px;text-align:right"></td>
-    <td style="padding:4px 8px;text-align:center">
-      <input type="checkbox" ${c.pagada?'checked':''} onchange="_afipCuotaEdit(${i},'pagada',this.checked)" style="width:16px;height:16px;cursor:pointer">
-    </td>
+    <td style="padding:4px 8px"><input type="date" value="${c.vencimiento1||c.vencimiento||''}" onchange="_afipCuotaEdit2(${i},'vencimiento1',this.value)" style="border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:4px;padding:2px 4px;font-size:12px"></td>
+    <td style="padding:4px 8px"><input type="date" value="${c.vencimiento2||''}" onchange="_afipCuotaEdit2(${i},'vencimiento2',this.value)" style="border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:4px;padding:2px 4px;font-size:12px"></td>
+    <td style="padding:4px 8px;text-align:right"><input type="number" value="${c.monto||''}" onchange="_afipCuotaEdit2(${i},'monto',Number(this.value))" style="border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:4px;padding:2px 4px;font-size:12px;width:90px;text-align:right"></td>
     <td style="padding:4px 4px"><button type="button" onclick="_afipRemoveCuota(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:0 4px">×</button></td>
   </tr>`).join('');
+}
+function _afipCuotaEdit2(idx, field, val) {
+  _afipCuotasTemp[idx][field] = val;
+  if (field === 'vencimiento1') _afipCuotasTemp[idx].vencimiento = val;
 }
 
 let _afipCuotasTemp = [];
@@ -4261,7 +4492,7 @@ function _afipRemoveCuota(idx) {
   renderAfipCuotasTable(_afipCuotasTemp);
 }
 function addAfipCuota() {
-  _afipCuotasTemp.push({numero:_afipCuotasTemp.length+1, vencimiento:'', monto:0, pagada:false});
+  _afipCuotasTemp.push({numero:_afipCuotasTemp.length+1, vencimiento1:'', vencimiento2:'', vencimiento:'', monto:0, pagada:false});
   renderAfipCuotasTable(_afipCuotasTemp);
 }
 
@@ -4289,19 +4520,26 @@ async function savePlanAfip() {
   if (id) {
     const idx = _planesAfip.findIndex(r => r[0] === id);
     if (idx >= 0) { _planesAfip[idx][1]=fecha; _planesAfip[idx][2]=nro; _planesAfip[idx][3]=concepto; _planesAfip[idx][4]=cuotasJSON; _planesAfip[idx][5]=notas; }
-    await sheetsUpdateById('PLANES_AFIP', id, 'B', fecha);
-    await sheetsUpdateById('PLANES_AFIP', id, 'C', nro);
-    await sheetsUpdateById('PLANES_AFIP', id, 'D', concepto);
-    await sheetsUpdateById('PLANES_AFIP', id, 'E', cuotasJSON);
-    await sheetsUpdateById('PLANES_AFIP', id, 'F', notas);
+    saveLSSnapshot();
+    renderPlanesAfip();
+    if (document.getElementById('section-planes-afip')?.classList.contains('active')) renderPlanesAfipTab();
+    closeModal('modal-plan-afip'); toast('Plan AFIP guardado');
+    Promise.all([
+      sheetsUpdateById('PLANES_AFIP', id, 'B', fecha),
+      sheetsUpdateById('PLANES_AFIP', id, 'C', nro),
+      sheetsUpdateById('PLANES_AFIP', id, 'D', concepto),
+      sheetsUpdateById('PLANES_AFIP', id, 'E', cuotasJSON),
+      sheetsUpdateById('PLANES_AFIP', id, 'F', notas)
+    ]).catch(e=>toast('Error al sincronizar con Google: '+e.message,'error'));
   } else {
     const row = [uid(), fecha, nro, concepto, cuotasJSON, notas];
-    await sheetsAppend('PLANES_AFIP', [row]);
     _planesAfip.push(row);
+    saveLSSnapshot();
+    renderPlanesAfip();
+    if (document.getElementById('section-planes-afip')?.classList.contains('active')) renderPlanesAfipTab();
+    closeModal('modal-plan-afip'); toast('Plan AFIP guardado');
+    sheetsAppend('PLANES_AFIP', [row]).catch(e=>toast('Error al sincronizar con Google: '+e.message,'error'));
   }
-  renderPlanesAfip();
-  closeModal('modal-plan-afip');
-  toast('Plan AFIP guardado');
 }
 
 async function deletePlanAfip(id) {
