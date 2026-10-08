@@ -4555,20 +4555,13 @@ async function savePlanAfip() {
     ]).catch(e=>toast('Error al sincronizar con Google: '+e.message,'error'));
   } else {
     const row = ['AP'+Date.now(), fecha, nro, concepto, cuotasJSON, notas];
-    const saveBtn = document.querySelector('#modal-plan-afip .btn-primary');
-    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Guardando...'; }
-    try {
-      await sheetsAppend('PLANES_AFIP', [row]);
-      _planesAfip.push(row);
-      saveLSSnapshot();
-      renderPlanesAfip();
-      if (document.getElementById('section-planes-afip')?.classList.contains('active')) renderPlanesAfipTab();
-      closeModal('modal-plan-afip');
-      toast('Plan AFIP guardado');
-    } catch(e) {
-      toast('Error guardando plan: '+e.message, 'error');
-      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Guardar plan'; }
-    }
+    _planesAfip.push(row);
+    saveLSSnapshot();
+    renderPlanesAfip();
+    if (document.getElementById('section-planes-afip')?.classList.contains('active')) renderPlanesAfipTab();
+    closeModal('modal-plan-afip');
+    toast('Plan AFIP guardado');
+    sheetsAppend('PLANES_AFIP', [row]).catch(e => toast('Error al sincronizar con Google: '+e.message,'error'));
   }
 }
 
