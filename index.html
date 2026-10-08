@@ -1443,7 +1443,7 @@ function _applySheetData(map) {
   if (map.GASTOS)            _gastos       = map.GASTOS;
   if (map.CHEQUES_RECIBIDOS) _chequesRec   = map.CHEQUES_RECIBIDOS;
   if (map.CHEQUES_EMITIDOS)  _chequesEmi   = map.CHEQUES_EMITIDOS;
-  if (map.PLANES_AFIP)       _planesAfip   = map.PLANES_AFIP;
+  if (map.PLANES_AFIP?.length) _planesAfip  = map.PLANES_AFIP;
   populateMaestroSelect();
 }
 
@@ -1508,6 +1508,7 @@ async function _backgroundRefresh() {
     const map = Object.fromEntries(results.filter(Boolean));
     _applySheetData(map);
     saveLSSnapshot();
+    if (document.getElementById('section-planes-afip')?.classList.contains('active')) renderPlanesAfipTab();
   } catch(e) {}
 }
 
@@ -4249,8 +4250,13 @@ async function loadAndRenderPlanesAfip() {
   if (_planesAfip.length) { renderPlanesAfipTab(); return; }
   const el = document.getElementById('planes-afip-list');
   if (el) el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> Cargando...</div>';
-  _planesAfip = await sheetsGet('PLANES_AFIP');
-  saveLSSnapshot();
+  try {
+    const data = await sheetsGet('PLANES_AFIP');
+    if (data.length) { _planesAfip = data; saveLSSnapshot(); }
+  } catch(e) {
+    if (el) el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--error)">Error al cargar planes. Recargá la página.</div>';
+    return;
+  }
   renderPlanesAfipTab();
 }
 
