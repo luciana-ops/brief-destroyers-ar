@@ -518,19 +518,26 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="modal-body">
       <div style="background:var(--bg-2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px" id="pago-afip-info"></div>
       <div class="form-group">
-        <label>Mes de pago</label>
-        <input type="month" id="pago-afip-mes" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 10px;font-size:13px">
-      </div>
-      <div class="form-group">
         <label>Vencimiento utilizado</label>
-        <div style="display:flex;gap:8px;margin-top:6px">
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:normal">
-            <input type="radio" name="pago-afip-venc" value="1" id="pago-afip-v1" style="width:16px;height:16px"> 1° vencimiento <span id="pago-afip-v1-fecha" style="color:var(--muted);font-size:12px"></span>
+        <div style="display:flex;gap:16px;margin-top:6px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:normal" onclick="_pagoAfipVencChange('1')">
+            <input type="radio" name="pago-afip-venc" value="1" id="pago-afip-v1" style="width:16px;height:16px">
+            <span>1° venc.</span> <span id="pago-afip-v1-fecha" style="color:var(--muted);font-size:12px"></span>
           </label>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:normal">
-            <input type="radio" name="pago-afip-venc" value="2" id="pago-afip-v2" style="width:16px;height:16px"> 2° vencimiento <span id="pago-afip-v2-fecha" style="color:var(--muted);font-size:12px"></span>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:normal" onclick="_pagoAfipVencChange('2')">
+            <input type="radio" name="pago-afip-venc" value="2" id="pago-afip-v2" style="width:16px;height:16px">
+            <span>2° venc.</span> <span id="pago-afip-v2-fecha" style="color:var(--muted);font-size:12px"></span>
           </label>
         </div>
+        <div id="pago-afip-interes-note" style="display:none;margin-top:6px;font-size:12px;color:var(--yellow,#f59e0b)"><i class="fa-solid fa-circle-exclamation"></i> 2° vencimiento — podés ajustar el importe si tiene intereses</div>
+      </div>
+      <div class="form-group">
+        <label>Importe pagado</label>
+        <input type="number" id="pago-afip-monto" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 10px;font-size:13px" placeholder="Modificá si pagaste con intereses">
+      </div>
+      <div class="form-group">
+        <label>Mes de pago</label>
+        <input type="month" id="pago-afip-mes" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 10px;font-size:13px">
       </div>
       <input type="hidden" id="pago-afip-plan-id">
       <input type="hidden" id="pago-afip-cuota-idx">
@@ -3849,7 +3856,7 @@ function getEstructuraCombined() {
       fecha: c.fecha_pago+'-01',
       desc: `Plan AFIP ${p[2]||p[0]} — Cuota ${c.numero}`,
       cat: 'planes_afip',
-      monto: Number(c.monto||0),
+      monto: Number(c.monto_pagado||c.monto||0),
       source: 'afip',
       deleteId: null,
       proyecto: ''
@@ -4331,6 +4338,7 @@ function togglePlanAfipDetail(header) {
 }
 
 let _pagoAfipPlanId = null, _pagoAfipCuotaIdx = null;
+let _pagoAfipMontoCuota = 0;
 function openPagoAfipModal(planId, cuotaIdx) {
   const plan = _planesAfip.find(p => p[0] === planId);
   if (!plan) return;
@@ -4340,18 +4348,25 @@ function openPagoAfipModal(planId, cuotaIdx) {
   if (!cuota) return;
   _pagoAfipPlanId = planId;
   _pagoAfipCuotaIdx = cuotaIdx;
+  _pagoAfipMontoCuota = Number(cuota.monto||0);
   document.getElementById('pago-afip-title').textContent = `Plan ${plan[2]||''} — Cuota ${cuota.numero||cuotaIdx+1}`;
-  document.getElementById('pago-afip-info').innerHTML = `<strong>${plan[3]||''}</strong><br>Monto: <strong>${fmtARS(cuota.monto||0)}</strong>`;
+  document.getElementById('pago-afip-info').innerHTML = `<strong>${plan[3]||''}</strong> · Cuota ${cuota.numero||cuotaIdx+1}`;
   const now = new Date();
   document.getElementById('pago-afip-mes').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  document.getElementById('pago-afip-monto').value = _pagoAfipMontoCuota;
   const v1 = cuota.vencimiento1 || cuota.vencimiento || '';
   const v2 = cuota.vencimiento2 || '';
   document.getElementById('pago-afip-v1-fecha').textContent = v1 ? fmtFecha(v1) : '';
   document.getElementById('pago-afip-v2-fecha').textContent = v2 ? fmtFecha(v2) : '';
   document.getElementById('pago-afip-v1').checked = true;
-  if (!v2) { document.getElementById('pago-afip-v2').disabled = true; document.getElementById('pago-afip-v2').parentElement.style.opacity = '.4'; }
-  else { document.getElementById('pago-afip-v2').disabled = false; document.getElementById('pago-afip-v2').parentElement.style.opacity = '1'; }
+  document.getElementById('pago-afip-interes-note').style.display = 'none';
+  const v2El = document.getElementById('pago-afip-v2');
+  if (!v2) { v2El.disabled = true; v2El.closest('label').style.opacity = '.4'; }
+  else { v2El.disabled = false; v2El.closest('label').style.opacity = '1'; }
   document.getElementById('modal-pago-afip').style.display = 'flex';
+}
+function _pagoAfipVencChange(val) {
+  document.getElementById('pago-afip-interes-note').style.display = val === '2' ? 'block' : 'none';
 }
 
 async function savePagoAfip() {
@@ -4359,16 +4374,17 @@ async function savePagoAfip() {
   const cuotaIdx = _pagoAfipCuotaIdx;
   const mes = document.getElementById('pago-afip-mes').value;
   const tipoVenc = document.querySelector('input[name="pago-afip-venc"]:checked')?.value || '1';
+  const montoPagado = Number(document.getElementById('pago-afip-monto').value) || _pagoAfipMontoCuota;
   if (!mes) return toast('Seleccioná el mes de pago','warning');
+  if (!montoPagado) return toast('Ingresá el importe pagado','warning');
   const plan = _planesAfip.find(p => p[0] === planId);
   if (!plan) return;
   let cuotas = [];
   try { cuotas = JSON.parse(plan[4]||'[]'); } catch {}
-  cuotas[cuotaIdx] = { ...cuotas[cuotaIdx], pagada: true, fecha_pago: mes, tipo_pago: tipoVenc };
+  cuotas[cuotaIdx] = { ...cuotas[cuotaIdx], pagada: true, fecha_pago: mes, tipo_pago: tipoVenc, monto_pagado: montoPagado };
   plan[4] = JSON.stringify(cuotas);
   saveLSSnapshot();
   renderPlanesAfipTab();
-  // also refresh estructura/cierres if visible
   if (document.getElementById('section-gastos')?.classList.contains('active')) renderGastos();
   document.getElementById('modal-pago-afip').style.display = 'none';
   toast('Pago registrado — aparecerá en Estructura y Cierres');
