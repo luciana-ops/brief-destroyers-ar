@@ -844,8 +844,9 @@ tr:hover td{background:rgba(255,255,255,.03)}
           </div>
           <div class="form-group" id="fac-proyecto-group" style="flex:1;display:none">
             <label>Cliente / Proyecto</label>
-            <input id="fac-proyecto" list="fac-proyecto-list" placeholder="Nombre del cliente..." oninput="populateVentasSelect()">
-            <datalist id="fac-proyecto-list"></datalist>
+            <select id="fac-proyecto" onchange="populateVentasSelect()" style="width:100%">
+              <option value="">— Seleccioná cliente —</option>
+            </select>
             <div id="fac-venta-ref-group" style="display:none;margin-top:6px">
               <label style="font-size:12px;color:var(--muted)">Factura de venta asociada (opcional)</label>
               <select id="fac-venta-ref"></select>
@@ -2013,7 +2014,7 @@ function toggleFacRubro(){
   const v=document.getElementById('fac-rubro').value;
   document.getElementById('fac-cat-estructura-group').style.display=v==='estructura'?'block':'none';
   document.getElementById('fac-proyecto-group').style.display=v==='proyecto'?'block':'none';
-  if(v==='proyecto') populateProyectoDatalist('fac-proyecto-list');
+  if(v==='proyecto') populateProyectoSelect('fac-proyecto');
 }
 function toggleTagRubro(){
   const v=document.getElementById('tag-rubro').value;
@@ -2028,6 +2029,14 @@ function populateProyectoDatalist(dlId){
   _maestro.filter(r=>String(r[3]).toLowerCase()==='cliente').forEach(r=>nombres.add(String(r[1]).trim()));
   _facturas.filter(r=>String(r[5]).toLowerCase()==='venta').forEach(r=>nombres.add(String(r[4]).trim()));
   [...nombres].filter(Boolean).sort().forEach(n=>{const o=document.createElement('option');o.value=n;dl.appendChild(o);});
+}
+function populateProyectoSelect(selId, currentVal){
+  const sel=document.getElementById(selId); if(!sel) return;
+  const nombres=new Set();
+  _maestro.filter(r=>String(r[3]).toLowerCase()==='cliente').forEach(r=>nombres.add(String(r[1]).trim()));
+  _facturas.filter(r=>String(r[5]).toLowerCase()==='venta').forEach(r=>nombres.add(String(r[4]).trim()));
+  const sorted=[...nombres].filter(Boolean).sort();
+  sel.innerHTML='<option value="">— Seleccioná cliente —</option>'+sorted.map(n=>`<option value="${n}"${n===currentVal?' selected':''}>${n}</option>`).join('');
 }
 function _fillVentasSelect(selId, groupId, clienteVal) {
   const grp=document.getElementById(groupId); if(!grp) return;
@@ -2089,7 +2098,7 @@ function editFactura(id) {
   document.getElementById('fac-cat-estructura-group').style.display = hasCat ? 'block' : 'none';
   document.getElementById('fac-proyecto-group').style.display = hasProyecto ? 'block' : 'none';
   if (hasCat) document.getElementById('fac-cat-estructura').value = r[21]||'honorarios';
-  if (hasProyecto) { populateProyectoDatalist('fac-proyecto-list'); document.getElementById('fac-proyecto').value = r[21]||''; }
+  if (hasProyecto) { populateProyectoSelect('fac-proyecto', r[21]||''); }
   populateMaestroSelect();
   openModal('modal-factura');
 }
