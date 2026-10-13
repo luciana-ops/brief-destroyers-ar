@@ -928,6 +928,12 @@ tr:hover td{background:rgba(255,255,255,.03)}
           </select>
         </div>
       </div>
+      <div class="form-group" id="pa-proyecto-filter-group" style="display:none">
+        <label>Filtrar por proyecto</label>
+        <select id="pa-proyecto-filter" onchange="filtrarFacturasPorProveedor()" style="width:100%">
+          <option value="">— Todos los proyectos —</option>
+        </select>
+      </div>
       <div class="form-group" id="pa-facturas-group" style="display:none">
         <label>Facturas a pagar</label>
         <div id="pa-facturas-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--bg-2)"></div>
@@ -3156,7 +3162,14 @@ function filtrarFacturasPorProveedor() {
   const cuit = document.getElementById('pa-proveedor').value;
   const group = document.getElementById('pa-facturas-group');
   const list = document.getElementById('pa-facturas-list');
-  if (!cuit) { group.style.display='none'; document.getElementById('pa-saldo-info').style.display='none'; return; }
+  const proyFiltGroup = document.getElementById('pa-proyecto-filter-group');
+  const proyFiltSel = document.getElementById('pa-proyecto-filter');
+  if (!cuit) {
+    group.style.display='none';
+    proyFiltGroup.style.display='none';
+    document.getElementById('pa-saldo-info').style.display='none';
+    return;
+  }
   const normF = f => String(f||'').replace(/\D/g,'');
   const ncAmountsCompra = {};
   _facturas.filter(r => String(r[5]).toLowerCase()==='compra' && String(r[6]).toUpperCase()==='NC')
@@ -3169,12 +3182,27 @@ function filtrarFacturasPorProveedor() {
     const k = normF(r[2]);
     return (ncAmountsCompra[k]||0) >= Math.abs(Number(r[9]||0)) * 0.99;
   };
-  const facs = _facturas.filter(r =>
+  // Build all pending facturas for this proveedor
+  const allFacs = _facturas.filter(r =>
     String(r[3]).trim()===String(cuit).trim() &&
     String(r[5]).toLowerCase()==='compra' &&
     ['pendiente','parcial','anulada_parcial'].includes(String(r[10]).toLowerCase()) &&
     !cubiertaPorNC(r)
   );
+  // Proyecto filter: populate dropdown if any facturas have proyecto tag
+  const proyectos = [...new Set(allFacs.filter(r=>String(r[20]).toLowerCase()==='proyecto' && r[21]).map(r=>String(r[21]).trim()))].sort();
+  if (proyectos.length > 0) {
+    const current = proyFiltSel.value;
+    proyFiltSel.innerHTML = '<option value="">— Todos los proyectos —</option>' + proyectos.map(p=>`<option value="${p}"${p===current?' selected':''}>${p}</option>`).join('');
+    proyFiltGroup.style.display = 'block';
+  } else {
+    proyFiltGroup.style.display = 'none';
+    proyFiltSel.value = '';
+  }
+  const proyFiltVal = proyFiltSel.value;
+  const facs = proyFiltVal
+    ? allFacs.filter(r => String(r[20]).toLowerCase()==='proyecto' && String(r[21]).trim()===proyFiltVal)
+    : allFacs;
   list.innerHTML = facs.map(r => {
     const pagado = _pagos.filter(p=>p[3]===r[3] && pagoFolios(p).includes(r[2])).reduce((s,p)=>s+Number(p[5]||0),0);
     const ncAcreditado = ncAmountsCompra[normF(r[2])] || 0;
@@ -3246,6 +3274,8 @@ function openPagosModal() {
   document.getElementById('pa-facturas-group').style.display='none';
   document.getElementById('pa-facturas-list').innerHTML='';
   document.getElementById('pa-saldo-info').style.display='none';
+  document.getElementById('pa-proyecto-filter-group').style.display='none';
+  document.getElementById('pa-proyecto-filter').innerHTML='<option value="">— Todos los proyectos —</option>';
   document.getElementById('pa-cheques-list').innerHTML='';
   document.getElementById('pa-cheques-cartera-list').innerHTML='';
   document.getElementById('pa-proveedor').value='';
