@@ -2903,11 +2903,10 @@ async function saveCobro() {
   const totalCheques = _coCheques.filter(c=>Number(c.monto||0)>0 && c.banco && c.nro && c.vencimiento).reduce((s,c)=>s+Number(c.monto||0),0);
   const totalFacSaldo = cbs.reduce((s,cb)=>s+Number(cb.dataset.total||0),0);
   const totalCobrando = montoTransf + totalCheques;
-  if (totalFacSaldo > 0 && totalCobrando > totalFacSaldo * 2) {
+  if (totalFacSaldo > 0 && totalCobrando > totalFacSaldo * 1.001) {
+    toast(`No podés cobrar ${fmtARS(totalCobrando)} — las facturas seleccionadas suman ${fmtARS(totalFacSaldo)}`, 'error');
     btn.disabled = false;
-    const ok = window.confirm(`⚠️ El importe a cobrar es ${fmtARS(totalCobrando)}, pero el total de las facturas seleccionadas es ${fmtARS(totalFacSaldo)}.\n\n¿Es correcto? Verificá que no haya un error de coma o de ceros.`);
-    if (!ok) return;
-    btn.disabled = true;
+    return;
   }
   const monto = montoTransf + totalCheques;
   const medio = montoTransf>0 && totalCheques>0 ? 'mixto' : totalCheques>0 ? 'cheque' : 'transferencia';
