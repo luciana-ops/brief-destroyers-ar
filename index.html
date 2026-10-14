@@ -725,8 +725,13 @@ tr:hover td{background:rgba(255,255,255,.03)}
         </select>
       </div>
       <div class="form-group" id="batch-proyecto-group" style="display:none"><label>Cliente / Proyecto</label>
-        <input id="batch-proyecto" list="batch-proyecto-list" placeholder="Nombre del cliente...">
-        <datalist id="batch-proyecto-list"></datalist>
+        <select id="batch-proyecto" onchange="populateBatchVentasSelect()" style="width:100%">
+          <option value="">— Seleccioná cliente —</option>
+        </select>
+        <div id="batch-venta-ref-group" style="display:none;margin-top:6px">
+          <label style="font-size:12px;color:var(--muted)">Factura de venta asociada (opcional)</label>
+          <select id="batch-venta-ref" style="width:100%"></select>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -2331,8 +2336,9 @@ function toggleBatchRubro(){
   const v=document.getElementById('batch-rubro').value;
   document.getElementById('batch-cat-group').style.display=v==='estructura'?'block':'none';
   document.getElementById('batch-proyecto-group').style.display=v==='proyecto'?'block':'none';
-  if(v==='proyecto') populateProyectoDatalist('batch-proyecto-list');
+  if(v==='proyecto') { populateProyectoSelect('batch-proyecto'); document.getElementById('batch-venta-ref-group').style.display='none'; }
 }
+function populateBatchVentasSelect(){_fillVentasSelect('batch-venta-ref','batch-venta-ref-group',document.getElementById('batch-proyecto').value);}
 function openBatchTagModal(){
   const ids=[...document.querySelectorAll('.compra-check:checked')].map(c=>c.dataset.id);
   if(!ids.length) return;
@@ -2340,6 +2346,7 @@ function openBatchTagModal(){
   document.getElementById('batch-rubro').value='';
   document.getElementById('batch-cat-group').style.display='none';
   document.getElementById('batch-proyecto-group').style.display='none';
+  document.getElementById('batch-venta-ref-group').style.display='none';
   document.getElementById('batch-save-btn').disabled=false;
   openModal('modal-batch-tag');
 }
