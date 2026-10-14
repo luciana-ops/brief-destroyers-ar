@@ -909,6 +909,9 @@ tr:hover td{background:rgba(255,255,255,.03)}
         <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>— Cheques:</span><span id="co-bal-cheques">$0</span></div>
         <div style="display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--border);padding-top:8px;margin-top:4px"><span>Saldo pendiente:</span><span id="co-saldo">$0</span></div>
       </div>
+      <div id="co-overpay-warning" style="display:none;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px;color:#92400e">
+        <i class="fa-solid fa-triangle-exclamation"></i> <strong>Atención:</strong> el total a cobrar es <strong id="co-overpay-diff"></strong> mayor que el saldo de las facturas seleccionadas. Revisá el importe antes de guardar.
+      </div>
       <div class="form-group"><label>Notas</label><textarea id="co-notas"></textarea></div>
     </div>
     <div class="modal-footer">
@@ -2810,6 +2813,15 @@ function updateCoSaldo() {
   const saldoEl = document.getElementById('co-saldo');
   saldoEl.textContent = fmtARS(saldo);
   saldoEl.style.color = saldo <= 0 ? '#10b981' : 'var(--accent)';
+  // Alerta si se está cobrando mucho más de lo que suman las facturas
+  const totalCobrado = montoTransf + totalCheques + totalRet;
+  const overpayEl = document.getElementById('co-overpay-warning');
+  if (totalFac > 0 && totalCobrado > totalFac * 1.05) {
+    document.getElementById('co-overpay-diff').textContent = fmtARS(totalCobrado - totalFac);
+    overpayEl.style.display = 'block';
+  } else {
+    overpayEl.style.display = 'none';
+  }
 }
 function renderCobros() {
   const year = getFilter('co-year'), month = getFilter('co-month');
@@ -2889,6 +2901,14 @@ async function saveCobro() {
   const fecha = document.getElementById('co-fecha').value;
   const montoTransf = Number(document.getElementById('co-monto').value)||0;
   const totalCheques = _coCheques.filter(c=>Number(c.monto||0)>0 && c.banco && c.nro && c.vencimiento).reduce((s,c)=>s+Number(c.monto||0),0);
+  const totalFacSaldo = cbs.reduce((s,cb)=>s+Number(cb.dataset.total||0),0);
+  const totalCobrando = montoTransf + totalCheques;
+  if (totalFacSaldo > 0 && totalCobrando > totalFacSaldo * 2) {
+    btn.disabled = false;
+    const ok = window.confirm(`⚠️ El importe a cobrar es ${fmtARS(totalCobrando)}, pero el total de las facturas seleccionadas es ${fmtARS(totalFacSaldo)}.\n\n¿Es correcto? Verificá que no haya un error de coma o de ceros.`);
+    if (!ok) return;
+    btn.disabled = true;
+  }
   const monto = montoTransf + totalCheques;
   const medio = montoTransf>0 && totalCheques>0 ? 'mixto' : totalCheques>0 ? 'cheque' : 'transferencia';
   const nop = document.getElementById('co-nop').value;
